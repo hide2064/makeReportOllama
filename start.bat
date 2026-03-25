@@ -13,7 +13,7 @@ echo  makeReportOllama - Auto Start Script
 echo ============================================================
 echo.
 
-:: ── 1. Check / Install Node.js ──────────────────────────────
+:: [1/5] Check Node.js
 echo [1/5] Checking Node.js...
 where node >nul 2>&1
 if errorlevel 1 (
@@ -21,19 +21,21 @@ if errorlevel 1 (
     winget install -e --id OpenJS.NodeJS --silent
     if errorlevel 1 (
         echo [ERROR] Node.js installation failed. Please install manually.
-        pause & exit /b 1
+        pause
+        exit /b 1
     )
     call refreshenv >nul 2>&1
     where node >nul 2>&1
     if errorlevel 1 (
         echo [ERROR] node not found after install. Please restart terminal.
-        pause & exit /b 1
+        pause
+        exit /b 1
     )
 )
 for /f "tokens=*" %%v in ('node --version 2^>nul') do set "NODE_VER=%%v"
 echo Node.js %NODE_VER% OK.
 
-:: ── 2. Python venv setup ────────────────────────────────────
+:: [2/5] Python venv
 echo.
 echo [2/5] Setting up Python venv...
 if not exist "%VENV%\Scripts\activate.bat" (
@@ -41,18 +43,20 @@ if not exist "%VENV%\Scripts\activate.bat" (
     python -m venv "%VENV%"
     if errorlevel 1 (
         echo [ERROR] Failed to create venv. Check Python 3.9+ is installed.
-        pause & exit /b 1
+        pause
+        exit /b 1
     )
 )
 echo Installing pip packages...
 "%VENV%\Scripts\pip" install -q -r "%ROOT%backend\requirements.txt"
 if errorlevel 1 (
     echo [ERROR] pip install failed.
-    pause & exit /b 1
+    pause
+    exit /b 1
 )
 echo Python venv ready.
 
-:: ── 3. Frontend npm install ──────────────────────────────────
+:: [3/5] Frontend npm install
 echo.
 echo [3/5] Checking frontend dependencies...
 if not exist "%ROOT%frontend\node_modules" (
@@ -61,20 +65,21 @@ if not exist "%ROOT%frontend\node_modules" (
     call npm install --silent
     if errorlevel 1 (
         echo [ERROR] npm install failed.
-        popd & pause & exit /b 1
+        popd
+        pause
+        exit /b 1
     )
     popd
 )
 echo Frontend dependencies OK.
 
-:: ── 4. Start backend server (if not running) ────────────────
+:: [4/5] Start backend
 echo.
 echo [4/5] Checking backend server...
 curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" 2>nul | findstr "200" >nul
 if errorlevel 1 (
     echo Starting backend on port %BACKEND_PORT%...
-    start "makeReportOllama-Backend" /min cmd /c ^
-        "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% 2>> "%ROOT%backend\app.log""
+    start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT%"
     set /a "tries=0"
     :wait_backend
     timeout /t 2 /nobreak >nul
@@ -83,32 +88,31 @@ if errorlevel 1 (
     set /a "tries+=1"
     if !tries! lss 15 goto wait_backend
     echo [ERROR] Backend startup timed out. Check backend\app.log.
-    pause & exit /b 1
+    pause
+    exit /b 1
     :backend_ready
     echo Backend started.
 ) else (
     echo Backend already running.
 )
 
-:: ── 5. Start frontend server (if not running) ───────────────
+:: [5/5] Start frontend
 echo.
 echo [5/5] Checking frontend server...
 curl -s -o nul "%FRONTEND_URL%" 2>nul
 if errorlevel 1 (
     echo Starting frontend on port %FRONTEND_PORT%...
-    start "makeReportOllama-Frontend" /min cmd /c ^
-        "cd /d "%ROOT%frontend" && npm run dev"
+    start "makeReportOllama-Frontend" /min cmd /c "cd /d "%ROOT%frontend" && npm run dev"
     timeout /t 4 /nobreak >nul
     echo Frontend started.
 ) else (
     echo Frontend already running.
 )
 
-:: ── Open browser ─────────────────────────────────────────────
+:: Open browser
 echo.
 echo ============================================================
-echo  Ready! Opening browser...
-echo  URL: %FRONTEND_URL%
+echo  Ready! Opening browser at %FRONTEND_URL%
 echo ============================================================
 timeout /t 2 /nobreak >nul
 start "" "%FRONTEND_URL%"
