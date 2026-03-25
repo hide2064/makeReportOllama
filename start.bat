@@ -149,28 +149,24 @@ if not exist "%ROOT%frontend\node_modules" (
 )
 echo Frontend dependencies OK.
 
-:: [5/6] Start backend
+:: [5/6] Start backend (always restart to pick up code changes)
 echo.
-echo [5/6] Checking backend server...
+echo [5/6] Starting backend server...
+taskkill /fi "WINDOWTITLE eq makeReportOllama-Backend" /f >nul 2>&1
+timeout /t 1 /nobreak >nul
+start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
+set /a "tries=0"
+:wait_backend
+timeout /t 2 /nobreak >nul
 curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" 2>nul | findstr "200" >nul
-if errorlevel 1 (
-    echo Starting backend on port %BACKEND_PORT%...
-    start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT%"
-    set /a "tries=0"
-    :wait_backend
-    timeout /t 2 /nobreak >nul
-    curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" 2>nul | findstr "200" >nul
-    if not errorlevel 1 goto backend_ready
-    set /a "tries+=1"
-    if !tries! lss 15 goto wait_backend
-    echo [ERROR] Backend startup timed out. Check backend\app.log.
-    pause
-    exit /b 1
-    :backend_ready
-    echo Backend started.
-) else (
-    echo Backend already running.
-)
+if not errorlevel 1 goto backend_ready
+set /a "tries+=1"
+if !tries! lss 15 goto wait_backend
+echo [ERROR] Backend startup timed out. Check backend\app.log.
+pause
+exit /b 1
+:backend_ready
+echo Backend started.
 
 :: [6/6] Start frontend
 echo.
