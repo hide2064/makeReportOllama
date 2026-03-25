@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_URL     = "http://localhost:11434/api/generate"
 REQUEST_TIMEOUT = 360  # seconds (6分)
-DEFAULT_MODEL  = "llama3.2"  # Ollama にインストール済みのモデル名
+DEFAULT_MODEL  = "qwen3-vl:8b"  # Ollama にインストール済みのモデル名
 
 
 def generate(prompt: str, model: str = DEFAULT_MODEL) -> str:

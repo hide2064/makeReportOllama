@@ -8,7 +8,7 @@ set "FRONTEND_PORT=5173"
 set "BACKEND_URL=http://localhost:%BACKEND_PORT%/health"
 set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%"
 set "OLLAMA_URL=http://localhost:11434"
-set "OLLAMA_MODEL=llama3.2"
+set "OLLAMA_MODEL=qwen3-vl:8b"
 
 echo ============================================================
 echo  makeReportOllama - Auto Start Script
