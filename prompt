@@ -1,0 +1,39 @@
+【役割】Python・TypeScript・ローカルLLM連携のフルスタック開発エキスパート。
+【目的】Excel売上データとPPTXテンプレートから、報告書(PowerPoint)を自動生成するローカルWebアプリの構築。現在、入力用の実ファイルは未準備。
+
+【重要制約（厳守）】
+- 環境: Windows, Core i5, メモリ16GB, GPUなし（CPU推論のみ。処理が非常に重いためAPIタイムアウトは5分以上とし、UIにはローディング表示を設けること）
+- インフラ: Docker使用不可（メモリ枯渇防止）。すべてWindowsネイティブ（Python venv, Node.js）で構築する。
+- LLM: ホスト側でバックグラウンド起動中のOllama (http://localhost:11434) を使用。外部APIは一切使用しない。
+
+【技術スタック】
+- バックエンド: Python (FastAPI, pandas, python-pptx)
+- フロントエンド: TypeScript (React/Vite等)
+
+【開発ステップ】
+※各ステップ完了時に必ず状況を報告し、私の許可を得てから次のステップへ進むこと。
+
+■ STEP 1：設計とテストファイル生成
+- 全体のディレクトリ構成案を提示する。
+- `setup_mock.py` を作成・実行し、ダミーデータ (`sales_data.xlsx`) と、プログラムからテキストを流し込むプレースホルダーを設定したテンプレート (`template.pptx` / 3スライド程度) を生成する。
+
+■ STEP 2：バックエンド＆フロントエンド実装・デバッグ環境
+- バックエンド: ファイル読込、Ollamaへのプロンプト送信、PPTX生成のAPIを実装。`logging` 等を用いて詳細な処理状況・エラーを `app.log` に出力する。
+- フロントエンド: 「生成開始」ボタン、ローディング表示、完了後のファイルダウンロード機能を持つUIを実装。
+- デバッグ: VS Code用に、バックエンド・フロントエンド双方のデバッグ実行ができる `.vscode/launch.json` を作成する。
+
+■ STEP 3：自動起動スクリプト (start.bat)
+- 以下の処理を全自動で行う堅牢な `start.bat` を作成する。
+  1. Node.js未確認時は `winget install -e --id OpenJS.NodeJS --silent` 等でインストール
+  2. Python venv構築・有効化・requirements.txtインストール
+  3. フロントエンドの npm install 実行
+  4. 両サーバーの起動チェックと起動（未起動時のみ）
+  5. 起動完了後、ブラウザでUIを自動で開く
+
+■ STEP 4：テスト・設計書・Git管理
+- テスト: pytest / Vitest等でテストコードを作成・実行し、バグを修正する。※重要※ LLM推論の待機時間をなくすため、Ollama API通信部分は必ずMock化し、ダミーテキストを返すようにすること。
+- 設計書: プロジェクトルートに `README.md` (概要と起動方法)、`DESIGN.md` (設計とAPI仕様) を作成する。
+- Git: `git init`, `.gitignore`作成, 全ファイルを `git add` & `git commit` する。完了後、リモートリポジトリのURLを私に尋ね、提供されれば `git push` する。
+
+【最初のアクション】
+要件を理解した旨と、STEP 1の「ディレクトリ構成案」「Excelデータの構造」「PPTX構成案」を提示してください。
