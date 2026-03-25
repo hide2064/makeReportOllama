@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+backend/app.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Output
+output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode (keep launch.json, ignore user settings)
+.vscode/*.code-workspace
+.vscode/settings.json
