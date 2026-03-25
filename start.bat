@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 set "ROOT=%~dp0"
@@ -10,74 +9,72 @@ set "BACKEND_URL=http://localhost:%BACKEND_PORT%/health"
 set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%"
 
 echo ============================================================
-echo  makeReportOllama - 自動起動スクリプト
+echo  makeReportOllama - Auto Start Script
 echo ============================================================
 echo.
 
-:: ── 1. Node.js 確認 / インストール ─────────────────────────
-echo [1/5] Node.js を確認中...
+:: ── 1. Check / Install Node.js ──────────────────────────────
+echo [1/5] Checking Node.js...
 where node >nul 2>&1
 if errorlevel 1 (
-    echo Node.js が見つかりません。winget でインストールします...
+    echo Node.js not found. Installing via winget...
     winget install -e --id OpenJS.NodeJS --silent
     if errorlevel 1 (
-        echo [ERROR] Node.js のインストールに失敗しました。手動でインストールしてください。
+        echo [ERROR] Node.js installation failed. Please install manually.
         pause & exit /b 1
     )
-    :: PATH を再読み込み
     call refreshenv >nul 2>&1
     where node >nul 2>&1
     if errorlevel 1 (
-        echo [ERROR] インストール後も node が見つかりません。ターミナルを再起動してください。
+        echo [ERROR] node not found after install. Please restart terminal.
         pause & exit /b 1
     )
 )
 for /f "tokens=*" %%v in ('node --version 2^>nul') do set "NODE_VER=%%v"
-echo Node.js %NODE_VER% を確認しました。
+echo Node.js %NODE_VER% OK.
 
-:: ── 2. Python venv 構築・有効化・依存インストール ─────────
+:: ── 2. Python venv setup ────────────────────────────────────
 echo.
-echo [2/5] Python 仮想環境を準備中...
+echo [2/5] Setting up Python venv...
 if not exist "%VENV%\Scripts\activate.bat" (
-    echo venv を作成します...
+    echo Creating venv...
     python -m venv "%VENV%"
     if errorlevel 1 (
-        echo [ERROR] venv の作成に失敗しました。Python 3.9+ がインストールされているか確認してください。
+        echo [ERROR] Failed to create venv. Check Python 3.9+ is installed.
         pause & exit /b 1
     )
 )
-echo pip パッケージをインストール中...
+echo Installing pip packages...
 "%VENV%\Scripts\pip" install -q -r "%ROOT%backend\requirements.txt"
 if errorlevel 1 (
-    echo [ERROR] pip install に失敗しました。
+    echo [ERROR] pip install failed.
     pause & exit /b 1
 )
-echo Python 環境の準備完了。
+echo Python venv ready.
 
-:: ── 3. フロントエンド npm install ─────────────────────────
+:: ── 3. Frontend npm install ──────────────────────────────────
 echo.
-echo [3/5] フロントエンド依存パッケージを確認中...
+echo [3/5] Checking frontend dependencies...
 if not exist "%ROOT%frontend\node_modules" (
-    echo npm install を実行します...
+    echo Running npm install...
     pushd "%ROOT%frontend"
     call npm install --silent
     if errorlevel 1 (
-        echo [ERROR] npm install に失敗しました。
+        echo [ERROR] npm install failed.
         popd & pause & exit /b 1
     )
     popd
 )
-echo フロントエンド依存パッケージ OK。
+echo Frontend dependencies OK.
 
-:: ── 4. バックエンドサーバー起動（未起動時のみ）────────────
+:: ── 4. Start backend server (if not running) ────────────────
 echo.
-echo [4/5] バックエンドサーバーを確認・起動中...
+echo [4/5] Checking backend server...
 curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" 2>nul | findstr "200" >nul
 if errorlevel 1 (
-    echo バックエンドを起動します (ポート %BACKEND_PORT%)...
+    echo Starting backend on port %BACKEND_PORT%...
     start "makeReportOllama-Backend" /min cmd /c ^
         "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% 2>> "%ROOT%backend\app.log""
-    :: 起動待機（最大30秒）
     set /a "tries=0"
     :wait_backend
     timeout /t 2 /nobreak >nul
@@ -85,39 +82,39 @@ if errorlevel 1 (
     if not errorlevel 1 goto backend_ready
     set /a "tries+=1"
     if !tries! lss 15 goto wait_backend
-    echo [ERROR] バックエンドの起動がタイムアウトしました。app.log を確認してください。
+    echo [ERROR] Backend startup timed out. Check backend\app.log.
     pause & exit /b 1
     :backend_ready
-    echo バックエンド起動完了。
+    echo Backend started.
 ) else (
-    echo バックエンドはすでに起動済みです。
+    echo Backend already running.
 )
 
-:: ── 5. フロントエンドサーバー起動（未起動時のみ）──────────
+:: ── 5. Start frontend server (if not running) ───────────────
 echo.
-echo [5/5] フロントエンドサーバーを確認・起動中...
+echo [5/5] Checking frontend server...
 curl -s -o nul "%FRONTEND_URL%" 2>nul
 if errorlevel 1 (
-    echo フロントエンドを起動します (ポート %FRONTEND_PORT%)...
+    echo Starting frontend on port %FRONTEND_PORT%...
     start "makeReportOllama-Frontend" /min cmd /c ^
         "cd /d "%ROOT%frontend" && npm run dev"
     timeout /t 4 /nobreak >nul
-    echo フロントエンド起動完了。
+    echo Frontend started.
 ) else (
-    echo フロントエンドはすでに起動済みです。
+    echo Frontend already running.
 )
 
-:: ── ブラウザで UI を開く ──────────────────────────────────
+:: ── Open browser ─────────────────────────────────────────────
 echo.
 echo ============================================================
-echo  起動完了！ブラウザで UI を開きます...
+echo  Ready! Opening browser...
 echo  URL: %FRONTEND_URL%
 echo ============================================================
 timeout /t 2 /nobreak >nul
 start "" "%FRONTEND_URL%"
 
 echo.
-echo このウィンドウを閉じてもサーバーは動作し続けます。
-echo サーバーを停止するにはタスクマネージャーからプロセスを終了してください。
+echo Servers are running in background windows.
+echo To stop: close the Backend/Frontend windows or use Task Manager.
 pause
 endlocal
