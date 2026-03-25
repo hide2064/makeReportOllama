@@ -9,6 +9,8 @@ set "BACKEND_URL=http://localhost:%BACKEND_PORT%/health"
 set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%"
 set "OLLAMA_URL=http://localhost:11434"
 set "OLLAMA_MODEL=qwen3-vl:8b"
+set "OLLAMA_DEFAULT_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+set "OLLAMA_EXE=ollama"
 
 echo ============================================================
 echo  makeReportOllama - Auto Start Script
@@ -21,15 +23,10 @@ where node >nul 2>&1
 if errorlevel 1 (
     echo Node.js not found. Installing via winget...
     winget install -e --id OpenJS.NodeJS --silent
-    if errorlevel 1 (
-        echo [ERROR] Node.js installation failed. Please install manually.
-        pause
-        exit /b 1
-    )
-    call refreshenv >nul 2>&1
+    :: winget returns non-zero even for "already installed" - check exe directly
     where node >nul 2>&1
     if errorlevel 1 (
-        echo [ERROR] node not found after install. Please restart terminal.
+        echo [ERROR] node not found after install. Please restart terminal and run start.bat again.
         pause
         exit /b 1
     )
@@ -40,32 +37,47 @@ echo Node.js %NODE_VER% OK.
 :: [2/6] Check / Install Ollama
 echo.
 echo [2/6] Checking Ollama...
+
+:: Resolve ollama executable: PATH first, then default install location
 where ollama >nul 2>&1
-if errorlevel 1 (
-    echo Ollama not found. Installing via winget...
-    winget install -e --id Ollama.Ollama --silent
-    if errorlevel 1 (
-        echo [ERROR] Ollama installation failed. Please install from https://ollama.com manually.
-        pause
-        exit /b 1
-    )
-    call refreshenv >nul 2>&1
-    where ollama >nul 2>&1
-    if errorlevel 1 (
-        echo [ERROR] ollama not found after install. Please restart terminal.
-        pause
-        exit /b 1
-    )
-    echo Ollama installed.
-) else (
-    echo Ollama found.
+if not errorlevel 1 (
+    set "OLLAMA_EXE=ollama"
+    echo Ollama found in PATH.
+    goto ollama_exe_ready
 )
+if exist "%OLLAMA_DEFAULT_EXE%" (
+    set "OLLAMA_EXE=%OLLAMA_DEFAULT_EXE%"
+    echo Ollama found at default path.
+    goto ollama_exe_ready
+)
+
+:: Not found anywhere - install via winget
+echo Ollama not found. Installing via winget...
+winget install -e --id Ollama.Ollama --silent
+:: Wait a moment for installer to finish
+timeout /t 3 /nobreak >nul
+
+:: Re-check after install
+where ollama >nul 2>&1
+if not errorlevel 1 (
+    set "OLLAMA_EXE=ollama"
+    goto ollama_exe_ready
+)
+if exist "%OLLAMA_DEFAULT_EXE%" (
+    set "OLLAMA_EXE=%OLLAMA_DEFAULT_EXE%"
+    goto ollama_exe_ready
+)
+echo [ERROR] Ollama not found after install. Please restart terminal and run start.bat again.
+pause
+exit /b 1
+
+:ollama_exe_ready
 
 :: Start Ollama service if not running
 curl -s -o nul "%OLLAMA_URL%" 2>nul
 if errorlevel 1 (
     echo Starting Ollama service...
-    start "Ollama" /min ollama serve
+    start "Ollama" /min "%OLLAMA_EXE%" serve
     echo Waiting for Ollama to start...
     set /a "tries=0"
     :wait_ollama
@@ -85,10 +97,10 @@ if errorlevel 1 (
 
 :: Check / Pull model
 echo Checking model "%OLLAMA_MODEL%"...
-ollama list 2>nul | findstr /i "%OLLAMA_MODEL%" >nul
+"%OLLAMA_EXE%" list 2>nul | findstr /i "%OLLAMA_MODEL%" >nul
 if errorlevel 1 (
     echo Model "%OLLAMA_MODEL%" not found. Pulling now (this may take a while)...
-    ollama pull %OLLAMA_MODEL%
+    "%OLLAMA_EXE%" pull %OLLAMA_MODEL%
     if errorlevel 1 (
         echo [ERROR] Failed to pull model "%OLLAMA_MODEL%".
         pause
