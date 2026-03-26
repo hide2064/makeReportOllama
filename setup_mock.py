@@ -38,15 +38,16 @@ PPTX_PATH = os.path.join(OUTPUT_DIR, "template.pptx")
 def create_csv():
     random.seed(2025)
 
+    # (単価, 原価率) のタプル
     products = {
-        "クラウドプラン Pro":    120_000,
-        "クラウドプラン Basic":   45_000,
-        "エンタープライズ SaaS":  380_000,
-        "保守サポート契約":        80_000,
-        "コンサルティング":       200_000,
-        "データ分析ツール":        95_000,
-        "セキュリティパッケージ": 150_000,
-        "ライセンス（年間）":     250_000,
+        "クラウドプラン Pro":    (120_000, 0.38),
+        "クラウドプラン Basic":   (45_000, 0.42),
+        "エンタープライズ SaaS":  (380_000, 0.30),
+        "保守サポート契約":        (80_000, 0.50),
+        "コンサルティング":       (200_000, 0.35),
+        "データ分析ツール":        (95_000, 0.40),
+        "セキュリティパッケージ": (150_000, 0.33),
+        "ライセンス（年間）":     (250_000, 0.28),
     }
     reps = ["田中 健", "佐藤 美咲", "鈴木 一郎", "山田 花子",
             "中村 大輔", "小林 奈々", "加藤 誠", "吉田 彩",
@@ -78,7 +79,7 @@ def create_csv():
         trend = {1: 0.75, 2: 0.80, 3: 0.95, 4: 1.05, 5: 1.15, 6: 1.10}.get(month, 1.0)
 
         prod_name = random.choice(list(products.keys()))
-        unit_price = products[prod_name]
+        unit_price, cost_rate = products[prod_name]
         rep = random.choice(reps)
         region = random.choice(rep_region_bias[rep])
 
@@ -91,19 +92,33 @@ def create_csv():
         # 1000円単位に丸め
         amount = round(amount / 1000) * 1000
 
+        # 原価・利益額・利益率を計算（原価率に±5%の揺れを加える）
+        actual_cost_rate = cost_rate * random.uniform(0.95, 1.05)
+        cost   = round(amount * actual_cost_rate / 1000) * 1000
+        profit = amount - cost
+        margin = round(profit / amount * 100, 1) if amount > 0 else 0.0
+
         rows.append({
-            "日付":     d.strftime("%Y-%m-%d"),
-            "商品名":   prod_name,
-            "担当者":   rep,
-            "地域":     region,
-            "数量":     qty,
-            "売上金額": amount,
+            "日付":       d.strftime("%Y-%m-%d"),
+            "商品名":     prod_name,
+            "担当者":     rep,
+            "地域":       region,
+            "数量":       qty,
+            "売上金額":   amount,
+            "原価":       cost,
+            "利益額":     profit,
+            "利益率(%)":  margin,
         })
 
     df = pd.DataFrame(rows).sort_values("日付").reset_index(drop=True)
     df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
-    total = df["売上金額"].sum()
-    print(f"[OK] CSV 生成: {CSV_PATH}  ({len(df)} 行 / 総売上 {total:,}円)")
+    xlsx_path = CSV_PATH.replace(".csv", ".xlsx")
+    df.to_excel(xlsx_path, index=False)
+    total  = df["売上金額"].sum()
+    profit = df["利益額"].sum()
+    margin = round(profit / total * 100, 1)
+    print(f"[OK] CSV  生成: {CSV_PATH}  ({len(df)} 行 / 総売上 {total:,}円 / 利益率 {margin}%)")
+    print(f"[OK] XLSX 生成: {xlsx_path}")
 
 
 # ════════════════════════════════════════════════════════

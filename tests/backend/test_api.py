@@ -139,14 +139,14 @@ def test_generate_invalid_excel():
 
 def test_download_not_found():
     """レポート未生成時に 404 が返ることを確認。"""
-    import shutil
-    output = os.path.join(os.path.dirname(__file__), "../../output/report.pptx")
-    backup = output + ".bak"
-    if os.path.exists(output):
-        shutil.move(output, backup)
+    import routers.report as report_module
+    # output_path を空にリセットして「未生成」状態を作る
+    with report_module._status_lock:
+        prev = report_module._status.get("output_path", "")
+        report_module._status["output_path"] = ""
     try:
         res = client.get("/api/download")
         assert res.status_code == 404
     finally:
-        if os.path.exists(backup):
-            shutil.move(backup, output)
+        with report_module._status_lock:
+            report_module._status["output_path"] = prev

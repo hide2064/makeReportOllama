@@ -9,6 +9,7 @@ import logging
 import os
 import tempfile
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -36,7 +37,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 # ── 処理状態（スレッド間共有） ────────────────────────────────
 _status_lock = threading.Lock()
-_status: dict = {"step": "", "done": False, "error": ""}
+_status: dict = {"step": "", "done": False, "error": "", "output_path": ""}
 _executor = ThreadPoolExecutor(max_workers=1)
 
 
@@ -53,7 +54,9 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
         suffix        = Path(excel_filename).suffix.lower() or ".xlsx"
         excel_path    = os.path.join(tmpdir, f"sales_data{suffix}")
         template_path = os.path.join(tmpdir, "template.pptx")
-        output_path   = str(OUTPUT_DIR / "report.pptx")
+        # UUID ベースの出力パス（同時アクセス時の上書き競合を防ぐ）
+        job_id      = uuid.uuid4().hex[:12]
+        output_path = str(OUTPUT_DIR / f"report_{job_id}.pptx")
 
         with open(excel_path, "wb") as f:
             f.write(excel_data)
@@ -68,7 +71,7 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
             _set_status(error=str(e))
             return
 
-        # Step 2a: Analyst AI — 数値データを構造化 JSON に変換
+        # Step 2a: Analyst AI — 数値データを構造化 JSON に変換（最大 3 回試行）
         _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {MODEL_ANALYST})\n"
                          "       数値・トレンドを抽出しています。")
 
@@ -76,17 +79,30 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
             _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {MODEL_ANALYST})\n"
                              f"       生成中... {count} トークン生成済み")
 
-        try:
-            analyst_raw = generate(
-                build_analyst_prompt(summary_data["raw_summary"]),
-                model=MODEL_ANALYST,
-                on_token=_on_analyst_token,
-            )
-            analyst_data = parse_analyst_json(analyst_raw)
-            logger.info(f"Analyst 結果: {list(analyst_data.keys())}")
-        except RuntimeError as e:
-            _set_status(error=str(e))
-            return
+        analyst_data: dict = {}
+        analyst_prompt = build_analyst_prompt(summary_data["raw_summary"])
+        max_analyst_retries = 3
+        for attempt in range(1, max_analyst_retries + 1):
+            try:
+                analyst_raw  = generate(analyst_prompt, model=MODEL_ANALYST,
+                                        on_token=_on_analyst_token)
+                analyst_data = parse_analyst_json(analyst_raw)
+            except RuntimeError as e:
+                _set_status(error=str(e))
+                return
+
+            if analyst_data:
+                logger.info(f"Analyst 結果 (試行 {attempt}): {list(analyst_data.keys())}")
+                break
+
+            # JSON が空 → リトライ
+            if attempt < max_analyst_retries:
+                logger.warning(f"Analyst JSON が空 (試行 {attempt}/{max_analyst_retries})。リトライします。")
+                _set_status(step=f"[2/3]  売上データを再解析中です... (試行 {attempt + 1}/{max_analyst_retries})")
+            else:
+                # 最大試行回数を超えた場合は raw_summary でフォールバック
+                logger.warning("Analyst JSON の取得に失敗。raw_summary でフォールバックします。")
+                analyst_data = {}
 
         # Step 2b: RAG — 過去レポートから類似コンテキストを取得
         _set_status(step="[2/3]  過去レポートから関連情報を検索中です... (RAG)")
@@ -133,7 +149,7 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
             _set_status(error=f"PPTX 生成に失敗しました: {e}")
             return
 
-        _set_status(step="完了しました！", done=True)
+        _set_status(step="完了しました！", done=True, output_path=output_path)
 
     except Exception as e:
         logger.exception("予期しないエラー")
@@ -157,12 +173,22 @@ async def generate_report(
     if busy:
         raise HTTPException(status_code=409, detail="現在レポートを生成中です。処理が完了してから再度お試しください。")
 
+    # 前回ジョブの出力ファイルを削除（ディスク節約）
+    with _status_lock:
+        prev_path = _status.get("output_path", "")
+    if prev_path and Path(prev_path).exists():
+        try:
+            Path(prev_path).unlink()
+            logger.info(f"前回出力ファイルを削除: {prev_path}")
+        except OSError:
+            pass
+
     logger.info(f"generate_report 開始: excel={excel_file.filename}")
     excel_data    = await excel_file.read()
     template_data = await template_file.read()
     excel_filename = excel_file.filename or "sales_data.xlsx"
 
-    _set_status(step="[1/3]  Excel / CSV を読み込んでいます...", done=False, error="")
+    _set_status(step="[1/3]  Excel / CSV を読み込んでいます...", done=False, error="", output_path="")
     _executor.submit(_run_generation, excel_data, template_data, excel_filename)
 
     return {"status": "started"}
@@ -177,12 +203,13 @@ async def get_progress():
 
 @router.get("/api/download")
 async def download_report():
-    """生成済み report.pptx をダウンロードさせる。"""
-    output_path = OUTPUT_DIR / "report.pptx"
-    if not output_path.exists():
+    """生成済み PPTX をダウンロードさせる。"""
+    with _status_lock:
+        output_path = _status.get("output_path", "")
+    if not output_path or not Path(output_path).exists():
         raise HTTPException(status_code=404, detail="レポートファイルが見つかりません。先に生成してください。")
     return FileResponse(
-        path=str(output_path),
+        path=output_path,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         filename="report.pptx",
     )
