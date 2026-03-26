@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import LoadingOverlay from './components/LoadingOverlay'
 import ReferenceManager from './components/ReferenceManager'
-import UploadForm from './components/UploadForm'
+import UploadForm, { GenerateParams } from './components/UploadForm'
 import './App.css'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
@@ -15,15 +15,23 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg]       = useState<string>('')
   const [downloadUrl, setDownloadUrl] = useState<string>('')
 
-  const handleGenerate = async (excel: File, template: File) => {
+  const handleGenerate = async (params: GenerateParams) => {
     setStatus('loading')
     setStep('アップロード中...')
     setErrorMsg('')
     setDownloadUrl('')
 
     const form = new FormData()
-    form.append('excel_file', excel)
-    form.append('template_file', template)
+    form.append('excel_file', params.excelFile)
+    if (params.templateFile) {
+      form.append('template_file', params.templateFile)
+    }
+    form.append('template_name',        params.templateName)
+    form.append('slide_product_table',  String(params.slideProductTable))
+    form.append('slide_region_table',   String(params.slideRegionTable))
+    form.append('slide_rep_table',      String(params.slideRepTable))
+    form.append('slide_chart',          String(params.slideChart))
+    form.append('chart_product_type',   params.chartProductType)
 
     try {
       // ── 1. 処理開始リクエスト ──────────────────────────

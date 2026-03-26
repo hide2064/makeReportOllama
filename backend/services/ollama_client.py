@@ -106,7 +106,8 @@ def build_analyst_prompt(raw_summary: str) -> str:
         '  "bottom_regions": [{"name": "地域名", "amount": 数値}],\n'
         '  "top_reps": [{"name": "担当者名", "amount": 数値}],\n'
         '  "key_facts": ["重要な数値の事実（日本語）"],\n'
-        '  "concerns": ["懸念点・低迷要因（日本語）"]\n'
+        '  "concerns": ["懸念点・低迷要因（日本語）"],\n'
+        '  "yoy_change": {"2024年": "+12.3%", "2023年": "+8.5%"}\n'
         "}\n\n"
         "Sales data:\n"
         f"{raw_summary}"

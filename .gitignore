@@ -13,6 +13,13 @@ frontend/dist/
 # Output
 output/
 
+# RAG ベクターDB（大容量バイナリ）
+data/chroma_db/
+
+# pip install による不要ファイル
+=*.0
+=*.8
+
 # OS
 .DS_Store
 Thumbs.db

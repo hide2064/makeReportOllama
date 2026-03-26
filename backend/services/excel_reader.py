@@ -122,6 +122,46 @@ def read_and_summarize(file_path: str) -> dict:
         rate = (m_profit / m_sales * 100).round(1)
         monthly_margin = rate.reindex(list(monthly_totals.keys())).to_dict()
 
+    # 四半期 × 地域 クロス集計（直近 8 四半期）
+    qr = df.pivot_table(
+        index="地域", columns="四半期",
+        values="売上金額", aggfunc="sum", fill_value=0,
+    )
+    if len(qr.columns) > 8:
+        qr = qr.iloc[:, -8:]
+    quarterly_region_pivot = qr
+
+    # 四半期 × 担当者 クロス集計（売上合計 上位 8 名、直近 8 四半期）
+    rep_totals = df.groupby("担当者")["売上金額"].sum().sort_values(ascending=False)
+    top_reps   = rep_totals.index[:8].tolist()
+    qrep = df[df["担当者"].isin(top_reps)].pivot_table(
+        index="担当者", columns="四半期",
+        values="売上金額", aggfunc="sum", fill_value=0,
+    )
+    # top_reps の順序を維持
+    qrep = qrep.reindex([r for r in top_reps if r in qrep.index])
+    if len(qrep.columns) > 8:
+        qrep = qrep.iloc[:, -8:]
+    quarterly_rep_pivot = qrep
+
+    # 年次前年同期比（YoY）
+    yoy_text = ""
+    df["年"] = df["日付"].dt.year
+    yearly_s = df.groupby("年")["売上金額"].sum().sort_index()
+    if len(yearly_s) >= 2:
+        yoy_lines = []
+        years = list(yearly_s.index)
+        for i in range(1, len(years)):
+            prev, curr = years[i - 1], years[i]
+            prev_val, curr_val = yearly_s[prev], yearly_s[curr]
+            if prev_val > 0:
+                pct = (curr_val - prev_val) / prev_val * 100
+                sign = "+" if pct >= 0 else ""
+                yoy_lines.append(f"{curr}年: {sign}{pct:.1f}% (対{prev}年)")
+        if yoy_lines:
+            yoy_text = "【前年同期比】\n" + "\n".join(yoy_lines) + "\n"
+            raw_summary = raw_summary + "\n" + yoy_text
+
     logger.info("集計完了")
     return {
         "total_amount":             total_amount,
@@ -134,5 +174,7 @@ def read_and_summarize(file_path: str) -> dict:
         "monthly_totals":           monthly_totals,
         "product_totals":           product_totals,
         "quarterly_product_pivot":  quarterly_product_pivot,
+        "quarterly_region_pivot":   quarterly_region_pivot,
+        "quarterly_rep_pivot":      quarterly_rep_pivot,
         "monthly_margin":           monthly_margin,
     }

@@ -12,8 +12,9 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from services.excel_reader import read_and_summarize
@@ -35,6 +36,8 @@ router = APIRouter()
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
 # ── 処理状態（スレッド間共有） ────────────────────────────────
 _status_lock = threading.Lock()
 _status: dict = {"step": "", "done": False, "error": "", "output_path": ""}
@@ -48,20 +51,37 @@ def _set_status(**kwargs):
 
 
 # ── バックグラウンド処理（同期・スレッド実行） ─────────────────
-def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str):
+def _run_generation(
+    excel_data: bytes,
+    template_data: Optional[bytes],
+    excel_filename: str,
+    template_name: str = "",
+    slide_options: Optional[dict] = None,
+):
     tmpdir = tempfile.mkdtemp()
     try:
-        suffix        = Path(excel_filename).suffix.lower() or ".xlsx"
-        excel_path    = os.path.join(tmpdir, f"sales_data{suffix}")
-        template_path = os.path.join(tmpdir, "template.pptx")
+        suffix      = Path(excel_filename).suffix.lower() or ".xlsx"
+        excel_path  = os.path.join(tmpdir, f"sales_data{suffix}")
         # UUID ベースの出力パス（同時アクセス時の上書き競合を防ぐ）
         job_id      = uuid.uuid4().hex[:12]
         output_path = str(OUTPUT_DIR / f"report_{job_id}.pptx")
 
         with open(excel_path, "wb") as f:
             f.write(excel_data)
-        with open(template_path, "wb") as f:
-            f.write(template_data)
+
+        # テンプレートパスの解決
+        if template_name:
+            template_path = str(DATA_DIR / template_name)
+            if not Path(template_path).exists():
+                _set_status(error=f"テンプレートが見つかりません: {template_name}")
+                return
+        elif template_data:
+            template_path = os.path.join(tmpdir, "template.pptx")
+            with open(template_path, "wb") as f:
+                f.write(template_data)
+        else:
+            _set_status(error="テンプレートが指定されていません。ファイルをアップロードするか、サーバーのテンプレートを選択してください。")
+            return
 
         # Step 1
         _set_status(step="[1/3]  Excel / CSV を読み込んでいます...")
@@ -143,7 +163,10 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
                 monthly_totals=summary_data.get("monthly_totals"),
                 product_totals=summary_data.get("product_totals"),
                 quarterly_product_pivot=summary_data.get("quarterly_product_pivot"),
+                quarterly_region_pivot=summary_data.get("quarterly_region_pivot"),
+                quarterly_rep_pivot=summary_data.get("quarterly_rep_pivot"),
                 monthly_margin=summary_data.get("monthly_margin"),
+                slide_options=slide_options,
             )
         except Exception as e:
             _set_status(error=f"PPTX 生成に失敗しました: {e}")
@@ -163,8 +186,14 @@ def _run_generation(excel_data: bytes, template_data: bytes, excel_filename: str
 
 @router.post("/api/generate")
 async def generate_report(
-    excel_file:    UploadFile = File(..., description="売上データ Excel/CSV"),
-    template_file: UploadFile = File(..., description="PPTX テンプレート (.pptx)"),
+    excel_file:          UploadFile      = File(..., description="売上データ Excel/CSV"),
+    template_file:       Optional[UploadFile] = File(None, description="PPTX テンプレート (.pptx)"),
+    template_name:       str             = Form("", description="サーバー上のテンプレート名"),
+    slide_product_table: bool            = Form(True),
+    slide_region_table:  bool            = Form(False),
+    slide_rep_table:     bool            = Form(False),
+    slide_chart:         bool            = Form(True),
+    chart_product_type:  str             = Form("bar"),
 ):
     """処理をバックグラウンドスレッドで開始し、即座に返す。"""
     # 処理中の場合は 409 を返す（二重投入防止）
@@ -183,13 +212,25 @@ async def generate_report(
         except OSError:
             pass
 
-    logger.info(f"generate_report 開始: excel={excel_file.filename}")
+    logger.info(f"generate_report 開始: excel={excel_file.filename}, template_name={template_name!r}")
     excel_data    = await excel_file.read()
-    template_data = await template_file.read()
+    template_data = await template_file.read() if template_file else None
     excel_filename = excel_file.filename or "sales_data.xlsx"
 
+    slide_options = {
+        "product_table":       slide_product_table,
+        "region_table":        slide_region_table,
+        "rep_table":           slide_rep_table,
+        "chart":               slide_chart,
+        "chart_product_type":  chart_product_type,
+    }
+
     _set_status(step="[1/3]  Excel / CSV を読み込んでいます...", done=False, error="", output_path="")
-    _executor.submit(_run_generation, excel_data, template_data, excel_filename)
+    _executor.submit(
+        _run_generation,
+        excel_data, template_data, excel_filename,
+        template_name, slide_options,
+    )
 
     return {"status": "started"}
 

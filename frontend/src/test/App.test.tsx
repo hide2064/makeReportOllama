@@ -12,12 +12,16 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
 
-/** /api/references は常に空リストを返し、それ以外は queue から順番に返す */
+/** /api/references と /api/templates は常に固定値を返し、それ以外は queue から順番に返す */
 function setupFetch(...responses: object[]) {
   const queue = [...responses]
   mockFetch.mockImplementation(async (url: unknown) => {
-    if (String(url).startsWith('/api/references')) {
+    const urlStr = String(url)
+    if (urlStr.startsWith('/api/references')) {
       return { ok: true, json: async () => ({ references: [] }) }
+    }
+    if (urlStr.startsWith('/api/templates')) {
+      return { ok: true, json: async () => ({ templates: [] }) }
     }
     const next = queue.shift()
     if (!next) throw new Error(`Unexpected fetch: ${url}`)

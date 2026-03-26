@@ -4,6 +4,7 @@ FastAPI アプリケーションのエントリポイント。
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -11,9 +12,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # ── ロギング設定 ─────────────────────────────────────────
-LOG_FILE = Path(__file__).parent / "app.log"
+LOG_FILE  = Path(__file__).parent / "app.log"
+LOG_LEVEL = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVEL,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
@@ -38,11 +40,13 @@ app.add_middleware(
 )
 
 # ── ルーター登録 ─────────────────────────────────────────
-from routers.report import router as report_router          # noqa: E402
-from routers.references import router as references_router  # noqa: E402
+from routers.report import router as report_router              # noqa: E402
+from routers.references import router as references_router      # noqa: E402
+from routers.templates import router as templates_router        # noqa: E402
 
 app.include_router(report_router)
 app.include_router(references_router)
+app.include_router(templates_router)
 
 
 @app.get("/health")

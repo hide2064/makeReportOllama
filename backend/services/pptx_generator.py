@@ -132,18 +132,17 @@ def _fmt_man(value: int) -> str:
 
 # ── Phase 4a: 売上表スライド ──────────────────────────────────────
 
-def _add_table_slide(prs, quarterly_product_pivot):
-    """商品別四半期売上表スライドをプレゼンに追加する。"""
-    import pandas as pd
-    if quarterly_product_pivot is None or quarterly_product_pivot.empty:
-        logger.info("table_data なし → 売上表スライドをスキップ")
+def _add_table_slide(prs, pivot, title: str, row_header: str = "商品名"):
+    """汎用四半期売上表スライドをプレゼンに追加する。product/region/rep で再利用可能。"""
+    if pivot is None or pivot.empty:
+        logger.info(f"table_data なし → {title} スライドをスキップ")
         return
 
     slide = _add_blank_slide(prs)
-    _slide_header(slide, "商品別売上表")
+    _slide_header(slide, title)
     _slide_footer(slide)
 
-    qp       = quarterly_product_pivot
+    qp       = pivot
     products = list(qp.index)
     quarters = list(qp.columns)
 
@@ -180,7 +179,7 @@ def _add_table_slide(prs, quarterly_product_pivot):
     tbl.rows[n_rows - 1].height = Emu(520_000)  # 合計行
 
     # ── ヘッダー行 ───────────────────────────────────────────
-    _set_cell(tbl.cell(0, 0), "商品名", bold=True, bg=NAVY, fg=WHITE,
+    _set_cell(tbl.cell(0, 0), row_header, bold=True, bg=NAVY, fg=WHITE,
               align=PP_ALIGN.LEFT, font_size=9)
     for ci, q in enumerate(quarters):
         label = q[2:] if len(q) >= 6 else q   # "2022Q1" → "22Q1"
@@ -217,13 +216,14 @@ def _add_table_slide(prs, quarterly_product_pivot):
     _set_cell(tbl.cell(tr, n_cols - 1), _fmt_man(grand_total), bold=True,
               bg=GOLD, fg=WHITE, align=PP_ALIGN.RIGHT, font_size=9)
 
-    logger.info(f"売上表スライド追加: {len(products)} 商品 × {len(quarters)} 四半期")
+    logger.info(f"{title} スライド追加: {len(products)} 行 × {len(quarters)} 四半期")
 
 
 # ── Phase 4b: グラフスライド ──────────────────────────────────────
 
 def _add_chart_slide(prs, monthly_totals: dict, product_totals: dict,
-                     monthly_margin: dict | None = None):
+                     monthly_margin: dict | None = None,
+                     product_chart_type: str = "bar"):
     """月次推移バーチャート + 商品別構成横棒グラフをスライドに追加する。"""
     if not _MPL_OK:
         logger.warning("matplotlib が利用不可 → グラフスライドをスキップ")
@@ -277,31 +277,44 @@ def _add_chart_slide(prs, monthly_totals: dict, product_totals: dict,
         ax1r.set_ylim(0, 100)
         ax1r.spines[["top"]].set_visible(False)
 
-    # 右: 商品別売上横棒グラフ ─────────────────────────────────
-    ax2     = axes[1]
-    prods   = list(product_totals.keys())[:8]
-    p_vals  = [product_totals[p] // 10_000 for p in prods]
+    # 右: 商品別売上グラフ ─────────────────────────────────────
+    ax2    = axes[1]
+    prods  = list(product_totals.keys())[:8]
+    p_vals = [product_totals[p] // 10_000 for p in prods]
     palette = ["#1B2E4C", "#2C4A7A", "#C4973E", "#1A56A0",
                "#8B5CF6", "#0E9F6E", "#CC2828", "#556578"]
     colors2 = palette[:len(prods)]
 
-    ax2.barh(range(len(prods)), p_vals, color=colors2, edgecolor="white",
-             linewidth=0.3, zorder=3)
-    ax2.set_yticks(range(len(prods)))
-    ax2.set_yticklabels(prods, fontsize=9)
-    ax2.set_xlabel("売上金額（万円）", fontsize=9)
-    ax2.set_title("商品別売上構成", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
-    ax2.xaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax2.grid(axis="x", alpha=0.3, zorder=0)
-    ax2.set_facecolor("#F8F9FA")
-    ax2.spines[["top", "right"]].set_visible(False)
-    ax2.invert_yaxis()
-
-    # 棒の端に金額ラベル
-    for bar, val in zip(ax2.patches, p_vals):
-        ax2.text(bar.get_width() + max(p_vals) * 0.01,
-                 bar.get_y() + bar.get_height() / 2,
-                 f"{val:,}", va="center", ha="left", fontsize=8, color="#1B2E4C")
+    if product_chart_type == "pie":
+        # ドーナツ円グラフ
+        wedges, _, autotexts = ax2.pie(
+            p_vals, labels=None, colors=colors2,
+            autopct="%1.1f%%", startangle=90, pctdistance=0.78,
+            wedgeprops={"width": 0.55, "edgecolor": "white", "linewidth": 1.5},
+        )
+        for at in autotexts:
+            at.set_fontsize(7.5)
+        ax2.legend(wedges, prods, loc="lower center", bbox_to_anchor=(0.5, -0.22),
+                   ncol=2, fontsize=7.5, frameon=False)
+        ax2.set_title("商品別売上構成", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
+    else:
+        # 横棒グラフ（デフォルト）
+        ax2.barh(range(len(prods)), p_vals, color=colors2, edgecolor="white",
+                 linewidth=0.3, zorder=3)
+        ax2.set_yticks(range(len(prods)))
+        ax2.set_yticklabels(prods, fontsize=9)
+        ax2.set_xlabel("売上金額（万円）", fontsize=9)
+        ax2.set_title("商品別売上構成", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
+        ax2.xaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+        ax2.grid(axis="x", alpha=0.3, zorder=0)
+        ax2.set_facecolor("#F8F9FA")
+        ax2.spines[["top", "right"]].set_visible(False)
+        ax2.invert_yaxis()
+        # 棒の端に金額ラベル
+        for bar, val in zip(ax2.patches, p_vals):
+            ax2.text(bar.get_width() + max(p_vals) * 0.01,
+                     bar.get_y() + bar.get_height() / 2,
+                     f"{val:,}", va="center", ha="left", fontsize=8, color="#1B2E4C")
 
     plt.tight_layout(pad=1.5)
 
@@ -340,23 +353,39 @@ def _replace_text_in_slide(slide, replacements: dict[str, str]):
 # ── 公開 API ─────────────────────────────────────────────────────
 
 def generate_pptx(
-    template_path:            str,
-    output_path:              str,
-    summary_text:             str,
-    analysis_text:            str,
-    period:                   str,
-    monthly_totals:           dict | None = None,
-    product_totals:           dict | None = None,
-    quarterly_product_pivot          = None,   # pandas DataFrame | None
-    monthly_margin:           dict | None = None,
+    template_path:             str,
+    output_path:               str,
+    summary_text:              str,
+    analysis_text:             str,
+    period:                    str,
+    monthly_totals:            dict | None = None,
+    product_totals:            dict | None = None,
+    quarterly_product_pivot                = None,   # pandas DataFrame | None
+    quarterly_region_pivot                 = None,   # pandas DataFrame | None
+    quarterly_rep_pivot                    = None,   # pandas DataFrame | None
+    monthly_margin:            dict | None = None,
+    slide_options:             dict | None = None,
 ) -> str:
     """
     テンプレートを元に報告書 PPTX を生成して output_path に保存。
     Phase 4: 売上表スライド・グラフスライドをテンプレートの後ろに追加する。
+    slide_options キー:
+      product_table (bool, default True)
+      region_table  (bool, default False)
+      rep_table     (bool, default False)
+      chart         (bool, default True)
+      chart_product_type ("bar" | "pie", default "bar")
     """
     logger.info(f"PPTX 生成開始: template={template_path}")
     if not Path(template_path).exists():
         raise FileNotFoundError(f"テンプレートが見つかりません: {template_path}")
+
+    opts                = slide_options or {}
+    do_product_table    = opts.get("product_table", True)
+    do_region_table     = opts.get("region_table", False)
+    do_rep_table        = opts.get("rep_table", False)
+    do_chart            = opts.get("chart", True)
+    chart_product_type  = opts.get("chart_product_type", "bar")
 
     prs   = Presentation(template_path)
     today = date.today().strftime("%Y年%m月%d日")
@@ -372,16 +401,23 @@ def generate_pptx(
     for slide in prs.slides:
         _replace_text_in_slide(slide, replacements)
 
-    # Phase 4a: 売上表スライド
-    _add_table_slide(prs, quarterly_product_pivot)
+    # Phase 4a: 売上表スライド群
+    if do_product_table:
+        _add_table_slide(prs, quarterly_product_pivot, "商品別売上表", "商品名")
+    if do_region_table:
+        _add_table_slide(prs, quarterly_region_pivot,  "地域別売上表", "地域")
+    if do_rep_table:
+        _add_table_slide(prs, quarterly_rep_pivot,     "担当者別売上表", "担当者")
 
     # Phase 4b: グラフスライド
-    _add_chart_slide(
-        prs,
-        monthly_totals  or {},
-        product_totals  or {},
-        monthly_margin,
-    )
+    if do_chart:
+        _add_chart_slide(
+            prs,
+            monthly_totals or {},
+            product_totals or {},
+            monthly_margin,
+            chart_product_type,
+        )
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     prs.save(output_path)
