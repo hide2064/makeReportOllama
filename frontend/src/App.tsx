@@ -23,7 +23,7 @@ const App: React.FC = () => {
       const res = await fetch('/api/generate', {
         method: 'POST',
         body: form,
-        signal: AbortSignal.timeout(360_000), // 6 分
+        signal: AbortSignal.timeout(1_200_000), // 20 分
       })
 
       if (!res.ok) {

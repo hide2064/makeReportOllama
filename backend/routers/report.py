@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from services.excel_reader import read_and_summarize
-from services.ollama_client import build_analysis_prompt, build_summary_prompt, generate
+from services.ollama_client import build_combined_prompt, generate, parse_combined_response
 from services.pptx_generator import generate_pptx
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,12 @@ async def generate_report(
             logger.error(f"Excel 読み込みエラー: {e}")
             raise HTTPException(status_code=400, detail=str(e))
 
-        # ── Ollama でテキスト生成 ─────────────────────────
+        # ── Ollama でテキスト生成（1回で summary + analysis を取得）────
         try:
-            logger.info("Ollama: summary_text 生成中…")
-            summary_text = generate(build_summary_prompt(summary_data["raw_summary"]))
-
-            logger.info("Ollama: analysis_text 生成中…")
-            analysis_text = generate(build_analysis_prompt(summary_data["raw_summary"]))
+            logger.info("Ollama: summary + analysis 生成中 (1リクエスト)…")
+            combined = generate(build_combined_prompt(summary_data["raw_summary"]))
+            summary_text, analysis_text = parse_combined_response(combined)
+            logger.info(f"Ollama 生成完了 summary={len(summary_text)}字 analysis={len(analysis_text)}字")
         except RuntimeError as e:
             logger.error(f"Ollama エラー: {e}")
             raise HTTPException(status_code=503, detail=str(e))

@@ -11,7 +11,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL     = "http://localhost:11434/api/generate"
-REQUEST_TIMEOUT = 360  # seconds (6分)
+REQUEST_TIMEOUT = 1200  # seconds (20分)
 DEFAULT_MODEL  = "qwen3-vl:8b"  # Ollama にインストール済みのモデル名
 
 
@@ -41,6 +41,42 @@ def generate(prompt: str, model: str = DEFAULT_MODEL) -> str:
     except httpx.ConnectError:
         logger.error("Ollama に接続できません")
         raise RuntimeError("Ollama に接続できません。http://localhost:11434 が起動しているか確認してください。")
+
+
+def build_combined_prompt(raw_summary: str) -> str:
+    """サマリーと分析を1回のリクエストで生成するプロンプト。"""
+    return (
+        "あなたは優秀なビジネスアナリストです。\n"
+        "以下の売上データを分析し、下記の2つのセクションを日本語で作成してください。\n"
+        "各セクションは300字程度、箇条書きを使わず文章形式で記述してください。\n\n"
+        "【出力形式】\n"
+        "---SUMMARY---\n"
+        "（売上サマリーをここに記述）\n"
+        "---ANALYSIS---\n"
+        "（課題・所見と来月の改善策・方針をここに記述）\n\n"
+        "【売上データ】\n"
+        f"{raw_summary}"
+    )
+
+
+def parse_combined_response(response: str) -> tuple[str, str]:
+    """1回のレスポンスからサマリーと分析テキストを分離する。"""
+    summary_text  = ""
+    analysis_text = ""
+
+    if "---SUMMARY---" in response and "---ANALYSIS---" in response:
+        parts = response.split("---ANALYSIS---")
+        summary_part  = parts[0].replace("---SUMMARY---", "").strip()
+        analysis_part = parts[1].strip() if len(parts) > 1 else ""
+        summary_text  = summary_part
+        analysis_text = analysis_part
+    else:
+        # フォールバック: レスポンス全体をサマリーに使用
+        mid = len(response) // 2
+        summary_text  = response[:mid].strip()
+        analysis_text = response[mid:].strip()
+
+    return summary_text, analysis_text
 
 
 def build_summary_prompt(raw_summary: str) -> str:

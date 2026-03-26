@@ -53,7 +53,7 @@ def test_health_endpoint():
     assert res.json() == {"status": "ok"}
 
 
-@patch("routers.report.generate", return_value="Mock 生成テキスト")
+@patch("routers.report.generate", return_value="---SUMMARY---\nMock サマリー\n---ANALYSIS---\nMock 分析")
 def test_generate_success(mock_generate):
     """正常系: Ollama を Mock 化して PPTX が返ることを確認。"""
     excel_bytes    = _make_excel_bytes()
@@ -70,8 +70,8 @@ def test_generate_success(mock_generate):
     assert res.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     )
-    # Ollama が 2 回呼ばれること（summary + analysis）
-    assert mock_generate.call_count == 2
+    # Ollama が 1 回だけ呼ばれること（summary + analysis を統合）
+    assert mock_generate.call_count == 1
 
 
 @patch("routers.report.generate", side_effect=RuntimeError("Ollama に接続できません"))
