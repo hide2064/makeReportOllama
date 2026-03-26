@@ -1,6 +1,6 @@
 """
 excel_reader.py
-Excel ファイルを読み込み、売上データを集計して要約テキストを返す。
+Excel / CSV ファイルを読み込み、売上データを集計して要約テキストを返す。
 """
 
 import logging
@@ -11,9 +11,9 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def read_and_summarize(excel_path: str) -> dict:
+def read_and_summarize(file_path: str) -> dict:
     """
-    Excel を読み込み、Ollama に渡すための集計サマリーを返す。
+    Excel (.xlsx) または CSV (.csv) を読み込み、Ollama に渡すための集計サマリーを返す。
 
     Returns:
         {
@@ -26,17 +26,31 @@ def read_and_summarize(excel_path: str) -> dict:
           "raw_summary": str,  # Ollama プロンプトに埋め込む文字列
         }
     """
-    logger.info(f"Excel 読み込み開始: {excel_path}")
-    if not Path(excel_path).exists():
-        raise FileNotFoundError(f"Excel ファイルが見つかりません: {excel_path}")
+    logger.info(f"ファイル読み込み開始: {file_path}")
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"ファイルが見つかりません: {file_path}")
 
-    df = pd.read_excel(excel_path)
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        # UTF-8 → Shift-JIS の順でフォールバック
+        try:
+            df = pd.read_csv(file_path, encoding="utf-8")
+        except UnicodeDecodeError:
+            df = pd.read_csv(file_path, encoding="shift-jis")
+        logger.info("CSV として読み込み")
+    elif suffix in (".xlsx", ".xls"):
+        df = pd.read_excel(file_path)
+        logger.info("Excel として読み込み")
+    else:
+        raise ValueError(f"対応していないファイル形式です: {suffix}  (.xlsx / .csv のみ対応)")
+
     logger.info(f"読み込み行数: {len(df)}")
 
     required_cols = {"日付", "商品名", "担当者", "地域", "数量", "売上金額"}
     missing = required_cols - set(df.columns)
     if missing:
-        raise ValueError(f"必須列が不足しています: {missing}")
+        raise ValueError(f"必須列が不足しています: {missing}  (必須: {sorted(required_cols)})")
 
     df["日付"] = pd.to_datetime(df["日付"])
 

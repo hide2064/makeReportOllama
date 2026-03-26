@@ -21,12 +21,12 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
   return (
     <form className="upload-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label>売上データ Excel (.xlsx)</label>
+        <label>売上データ (.xlsx / .csv)</label>
         <div className="file-row">
           <input
             ref={excelRef}
             type="file"
-            accept=".xlsx"
+            accept=".xlsx,.xls,.csv"
             style={{ display: 'none' }}
             onChange={e => setExcelFile(e.target.files?.[0] ?? null)}
           />

@@ -19,6 +19,7 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 EXCEL_PATH = os.path.join(OUTPUT_DIR, "sales_data.xlsx")
+CSV_PATH   = os.path.join(OUTPUT_DIR, "sales_data.csv")
 PPTX_PATH  = os.path.join(OUTPUT_DIR, "template.pptx")
 
 
@@ -52,6 +53,8 @@ def create_excel():
     df = pd.DataFrame(rows).sort_values("日付").reset_index(drop=True)
     df.to_excel(EXCEL_PATH, index=False)
     print(f"[OK] Excel 生成: {EXCEL_PATH}  ({len(df)} 行)")
+    df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+    print(f"[OK] CSV   生成: {CSV_PATH}  ({len(df)} 行)")
 
 
 # ── 2. template.pptx ────────────────────────────────────
