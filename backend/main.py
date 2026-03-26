@@ -38,9 +38,11 @@ app.add_middleware(
 )
 
 # ── ルーター登録 ─────────────────────────────────────────
-from routers.report import router as report_router  # noqa: E402
+from routers.report import router as report_router          # noqa: E402
+from routers.references import router as references_router  # noqa: E402
 
 app.include_router(report_router)
+app.include_router(references_router)
 
 
 @app.get("/health")

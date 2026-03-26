@@ -90,13 +90,49 @@ def read_and_summarize(file_path: str) -> dict:
         f"【担当者別売上】\n{by_rep}\n"
     )
 
+    # ── グラフ・表用集計データ ────────────────────────────────────
+    df["月"]    = df["日付"].dt.to_period("M").astype(str)
+    df["四半期"] = df["日付"].dt.to_period("Q").astype(str)
+
+    # 直近 12 ヶ月の月次合計
+    monthly_s     = df.groupby("月")["売上金額"].sum().sort_index()
+    monthly_totals = monthly_s.tail(12).to_dict()
+
+    # 商品別合計（降順）
+    product_totals = (
+        df.groupby("商品名")["売上金額"].sum()
+        .sort_values(ascending=False)
+        .to_dict()
+    )
+
+    # 四半期 × 商品 クロス集計（直近 8 四半期）
+    qp = df.pivot_table(
+        index="商品名", columns="四半期",
+        values="売上金額", aggfunc="sum", fill_value=0,
+    )
+    if len(qp.columns) > 8:
+        qp = qp.iloc[:, -8:]
+    quarterly_product_pivot = qp
+
+    # 月次利益率（利益額列がある場合のみ）
+    monthly_margin: dict | None = None
+    if "利益額" in df.columns:
+        m_profit = df.groupby("月")["利益額"].sum()
+        m_sales  = df.groupby("月")["売上金額"].sum()
+        rate = (m_profit / m_sales * 100).round(1)
+        monthly_margin = rate.reindex(list(monthly_totals.keys())).to_dict()
+
     logger.info("集計完了")
     return {
-        "total_amount": total_amount,
-        "total_qty":    total_qty,
-        "by_product":   by_product,
-        "by_region":    by_region,
-        "by_rep":       by_rep,
-        "period":       f"{period_start} ～ {period_end}",
-        "raw_summary":  raw_summary,
+        "total_amount":             total_amount,
+        "total_qty":                total_qty,
+        "by_product":               by_product,
+        "by_region":                by_region,
+        "by_rep":                   by_rep,
+        "period":                   f"{period_start} ～ {period_end}",
+        "raw_summary":              raw_summary,
+        "monthly_totals":           monthly_totals,
+        "product_totals":           product_totals,
+        "quarterly_product_pivot":  quarterly_product_pivot,
+        "monthly_margin":           monthly_margin,
     }

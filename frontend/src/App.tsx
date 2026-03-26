@@ -1,9 +1,13 @@
 import React, { useState } from 'react'
 import LoadingOverlay from './components/LoadingOverlay'
+import ReferenceManager from './components/ReferenceManager'
 import UploadForm from './components/UploadForm'
 import './App.css'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
+
+const POLL_INTERVAL = 2000   // 2 秒ごとにポーリング
+const POLL_TIMEOUT  = 1_200_000  // 最大 20 分
 
 const App: React.FC = () => {
   const [status, setStatus]           = useState<Status>('idle')
@@ -22,58 +26,58 @@ const App: React.FC = () => {
     form.append('template_file', template)
 
     try {
+      // ── 1. 処理開始リクエスト ──────────────────────────
       const res = await fetch('/api/generate', {
         method: 'POST',
         body: form,
-        signal: AbortSignal.timeout(1_200_000), // 20 分
+        signal: AbortSignal.timeout(30_000),
       })
-
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
         throw new Error(err.detail ?? `HTTP ${res.status}`)
       }
 
-      // SSE ストリームを読み込む
-      const reader  = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer    = ''
+      // ── 2. 進捗ポーリング ──────────────────────────────
+      const deadline = Date.now() + POLL_TIMEOUT
+      while (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL))
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = JSON.parse(line.slice(6)) as {
-            step?: string
-            error?: string
-            done?: boolean
+        // ネットワーク瞬断（サーバー再起動など）は無視してリトライ
+        let data: { step: string; done: boolean; error: string } | null = null
+        try {
+          const progressRes = await fetch('/api/progress', {
+            signal: AbortSignal.timeout(10_000),
+          })
+          if (progressRes.ok) {
+            data = await progressRes.json()
           }
+        } catch {
+          // 瞬断 → 次の poll まで待つ
+          continue
+        }
+        if (!data) continue
 
-          if (data.error) throw new Error(data.error)
+        if (data.error) throw new Error(data.error)
+        if (data.step)  setStep(data.step)
 
-          if (data.step) setStep(data.step)
-
-          if (data.done) {
-            setStep('完了しました。ファイルをダウンロードしています...')
-            const dlRes = await fetch('/api/download', {
-              signal: AbortSignal.timeout(30_000),
-            })
-            if (!dlRes.ok) throw new Error('ダウンロードに失敗しました')
-            const blob = await dlRes.blob()
-            const url  = URL.createObjectURL(blob)
-            setDownloadUrl(url)
-            setStatus('success')
-          }
+        if (data.done) {
+          // ── 3. ダウンロード ─────────────────────────────
+          setStep('完了しました。ファイルをダウンロードしています...')
+          const dlRes = await fetch('/api/download', {
+            signal: AbortSignal.timeout(30_000),
+          })
+          if (!dlRes.ok) throw new Error('ダウンロードに失敗しました')
+          const blob = await dlRes.blob()
+          setDownloadUrl(URL.createObjectURL(blob))
+          setStatus('success')
+          return
         }
       }
+
+      throw new Error('処理がタイムアウトしました（20分）。')
+
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setErrorMsg(msg)
+      setErrorMsg(e instanceof Error ? e.message : String(e))
       setStatus('error')
     }
   }
@@ -101,6 +105,10 @@ const App: React.FC = () => {
         <section className="card">
           <h2>ファイルをアップロード</h2>
           <UploadForm onGenerate={handleGenerate} disabled={status === 'loading'} />
+        </section>
+
+        <section className="card">
+          <ReferenceManager />
         </section>
 
         {status === 'success' && (

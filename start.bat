@@ -8,7 +8,9 @@ set "FRONTEND_PORT=5173"
 set "BACKEND_URL=http://localhost:%BACKEND_PORT%/health"
 set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%"
 set "OLLAMA_URL=http://localhost:11434"
-set "OLLAMA_MODEL=qwen3-vl:8b"
+set "OLLAMA_MODEL_ANALYST=qwen2.5:3b"
+set "OLLAMA_MODEL_WRITER=qwen3:8b"
+set "OLLAMA_MODEL_EMBED=nomic-embed-text"
 set "OLLAMA_DEFAULT_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
 set "OLLAMA_EXE=ollama"
 
@@ -95,20 +97,52 @@ if errorlevel 1 (
     echo Ollama service already running.
 )
 
-:: Check / Pull model
-echo Checking model "%OLLAMA_MODEL%"...
-"%OLLAMA_EXE%" list 2>nul | findstr /i "%OLLAMA_MODEL%" >nul
+:: Check / Pull Analyst model
+echo Checking Analyst model "%OLLAMA_MODEL_ANALYST%"...
+"%OLLAMA_EXE%" list 2>nul | findstr /i "%OLLAMA_MODEL_ANALYST%" >nul
 if errorlevel 1 (
-    echo Model "%OLLAMA_MODEL%" not found. Pulling now - this may take a while...
-    "%OLLAMA_EXE%" pull %OLLAMA_MODEL%
+    echo Model "%OLLAMA_MODEL_ANALYST%" not found. Pulling now - this may take a while...
+    "%OLLAMA_EXE%" pull %OLLAMA_MODEL_ANALYST%
     if errorlevel 1 (
-        echo [ERROR] Failed to pull model "%OLLAMA_MODEL%".
+        echo [ERROR] Failed to pull model "%OLLAMA_MODEL_ANALYST%".
         pause
         exit /b 1
     )
-    echo Model "%OLLAMA_MODEL%" ready.
+    echo Model "%OLLAMA_MODEL_ANALYST%" ready.
 ) else (
-    echo Model "%OLLAMA_MODEL%" OK.
+    echo Model "%OLLAMA_MODEL_ANALYST%" OK.
+)
+
+:: Check / Pull Writer model
+echo Checking Writer model "%OLLAMA_MODEL_WRITER%"...
+"%OLLAMA_EXE%" list 2>nul | findstr /i "%OLLAMA_MODEL_WRITER%" >nul
+if errorlevel 1 (
+    echo Model "%OLLAMA_MODEL_WRITER%" not found. Pulling now - this may take a while...
+    "%OLLAMA_EXE%" pull %OLLAMA_MODEL_WRITER%
+    if errorlevel 1 (
+        echo [ERROR] Failed to pull model "%OLLAMA_MODEL_WRITER%".
+        pause
+        exit /b 1
+    )
+    echo Model "%OLLAMA_MODEL_WRITER%" ready.
+) else (
+    echo Model "%OLLAMA_MODEL_WRITER%" OK.
+)
+
+:: Check / Pull Embed model (RAG)
+echo Checking Embed model "%OLLAMA_MODEL_EMBED%"...
+"%OLLAMA_EXE%" list 2>nul | findstr /i "%OLLAMA_MODEL_EMBED%" >nul
+if errorlevel 1 (
+    echo Model "%OLLAMA_MODEL_EMBED%" not found. Pulling now - this may take a while...
+    "%OLLAMA_EXE%" pull %OLLAMA_MODEL_EMBED%
+    if errorlevel 1 (
+        echo [ERROR] Failed to pull model "%OLLAMA_MODEL_EMBED%".
+        pause
+        exit /b 1
+    )
+    echo Model "%OLLAMA_MODEL_EMBED%" ready.
+) else (
+    echo Model "%OLLAMA_MODEL_EMBED%" OK.
 )
 
 :: [3/6] Python venv
@@ -149,12 +183,12 @@ if not exist "%ROOT%frontend\node_modules" (
 )
 echo Frontend dependencies OK.
 
-:: [5/6] Start backend (always restart to pick up code changes)
+:: [5/6] Start backend
 echo.
 echo [5/6] Starting backend server...
 taskkill /fi "WINDOWTITLE eq makeReportOllama-Backend" /f >nul 2>&1
 timeout /t 1 /nobreak >nul
-start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
+start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT%"
 set /a "tries=0"
 :wait_backend
 timeout /t 2 /nobreak >nul
