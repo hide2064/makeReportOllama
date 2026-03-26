@@ -2,17 +2,20 @@ import React from 'react'
 import './LoadingOverlay.css'
 
 interface Props {
-  message?: string
+  step?: string
 }
 
-const LoadingOverlay: React.FC<Props> = ({ message = 'レポートを生成中です...' }) => {
+const LoadingOverlay: React.FC<Props> = ({ step = '' }) => {
   return (
     <div className="overlay">
       <div className="overlay-box">
         <div className="spinner" />
-        <p className="overlay-message">{message}</p>
+        <p className="overlay-message">レポートを生成中です...</p>
+        {step && (
+          <p className="overlay-step">{step}</p>
+        )}
         <p className="overlay-sub">
-          ローカル LLM (Ollama) で分析中です。
+          処理が完了するまでこのままお待ちください。
           <br />
           CPU 推論のため最大 20 分かかる場合があります。
         </p>

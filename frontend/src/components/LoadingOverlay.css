@@ -38,6 +38,19 @@
   margin: 0 0 8px;
 }
 
+.overlay-step {
+  font-size: 0.95rem;
+  color: #1e1b4b;
+  font-weight: 600;
+  white-space: pre-line;
+  background: #eef2ff;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+  text-align: left;
+  line-height: 1.7;
+}
+
 .overlay-sub {
   font-size: 0.85rem;
   color: #6b7280;
