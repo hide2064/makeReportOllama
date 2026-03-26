@@ -35,7 +35,8 @@ async def generate_report(
 
     # ── 一時ファイルに保存 ──────────────────────────────
     with tempfile.TemporaryDirectory() as tmpdir:
-        excel_path    = os.path.join(tmpdir, "sales_data.xlsx")
+        excel_suffix  = Path(excel_file.filename).suffix.lower() if excel_file.filename else ".xlsx"
+        excel_path    = os.path.join(tmpdir, f"sales_data{excel_suffix}")
         template_path = os.path.join(tmpdir, "template.pptx")
         output_path   = str(OUTPUT_DIR / "report.pptx")
 
