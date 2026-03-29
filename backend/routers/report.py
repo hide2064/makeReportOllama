@@ -17,26 +17,24 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from config import ANALYST_MAX_RETRIES, DATA_DIR, MODEL_ANALYST, MODEL_WRITER, OUTPUT_DIR
 from services.excel_reader import read_and_summarize
-from services.rag_store import search_context
+from services.history_store import append_history
 from services.ollama_client import (
-    MODEL_ANALYST,
-    MODEL_WRITER,
     build_analyst_prompt,
     build_writer_prompt,
+    check_ollama,
     generate,
     parse_analyst_json,
     parse_writer_response,
 )
 from services.pptx_generator import generate_pptx
+from services.rag_store import search_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
-
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 # ── 処理状態（スレッド間共有） ────────────────────────────────
 _status_lock = threading.Lock()
@@ -57,6 +55,11 @@ def _run_generation(
     excel_filename: str,
     template_name: str = "",
     slide_options: Optional[dict] = None,
+    analyst_model: str = "",
+    writer_model: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    extra_context: str = "",
 ):
     tmpdir = tempfile.mkdtemp()
     try:
@@ -65,6 +68,9 @@ def _run_generation(
         # UUID ベースの出力パス（同時アクセス時の上書き競合を防ぐ）
         job_id      = uuid.uuid4().hex[:12]
         output_path = str(OUTPUT_DIR / f"report_{job_id}.pptx")
+        # モデル名の解決（空文字はデフォルト値を使用）
+        used_analyst = analyst_model or MODEL_ANALYST
+        used_writer  = writer_model  or MODEL_WRITER
 
         with open(excel_path, "wb") as f:
             f.write(excel_data)
@@ -83,28 +89,36 @@ def _run_generation(
             _set_status(error="テンプレートが指定されていません。ファイルをアップロードするか、サーバーのテンプレートを選択してください。")
             return
 
+        # Step 0: Ollama プリフライトチェック（接続 + モデル存在確認）
+        _set_status(step="[0/3]  Ollama の接続とモデルを確認しています...")
+        try:
+            check_ollama(used_analyst)
+            check_ollama(used_writer)
+        except RuntimeError as e:
+            _set_status(error=str(e))
+            return
+
         # Step 1
         _set_status(step="[1/3]  Excel / CSV を読み込んでいます...")
         try:
-            summary_data = read_and_summarize(excel_path)
+            summary_data = read_and_summarize(excel_path, date_from=date_from, date_to=date_to)
         except (FileNotFoundError, ValueError) as e:
             _set_status(error=str(e))
             return
 
         # Step 2a: Analyst AI — 数値データを構造化 JSON に変換（最大 3 回試行）
-        _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {MODEL_ANALYST})\n"
+        _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {used_analyst})\n"
                          "       数値・トレンドを抽出しています。")
 
         def _on_analyst_token(count: int):
-            _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {MODEL_ANALYST})\n"
+            _set_status(step=f"[2/3]  売上データを解析中です... (Analyst: {used_analyst})\n"
                              f"       生成中... {count} トークン生成済み")
 
         analyst_data: dict = {}
         analyst_prompt = build_analyst_prompt(summary_data["raw_summary"])
-        max_analyst_retries = 3
-        for attempt in range(1, max_analyst_retries + 1):
+        for attempt in range(1, ANALYST_MAX_RETRIES + 1):
             try:
-                analyst_raw  = generate(analyst_prompt, model=MODEL_ANALYST,
+                analyst_raw  = generate(analyst_prompt, model=used_analyst,
                                         on_token=_on_analyst_token)
                 analyst_data = parse_analyst_json(analyst_raw)
             except RuntimeError as e:
@@ -116,9 +130,9 @@ def _run_generation(
                 break
 
             # JSON が空 → リトライ
-            if attempt < max_analyst_retries:
-                logger.warning(f"Analyst JSON が空 (試行 {attempt}/{max_analyst_retries})。リトライします。")
-                _set_status(step=f"[2/3]  売上データを再解析中です... (試行 {attempt + 1}/{max_analyst_retries})")
+            if attempt < ANALYST_MAX_RETRIES:
+                logger.warning(f"Analyst JSON が空 (試行 {attempt}/{ANALYST_MAX_RETRIES})。リトライします。")
+                _set_status(step=f"[2/3]  売上データを再解析中です... (試行 {attempt + 1}/{ANALYST_MAX_RETRIES})")
             else:
                 # 最大試行回数を超えた場合は raw_summary でフォールバック
                 logger.warning("Analyst JSON の取得に失敗。raw_summary でフォールバックします。")
@@ -133,17 +147,20 @@ def _run_generation(
             logger.info("RAG コンテキストなし（過去資料未登録 or 類似度低）")
 
         # Step 2c: Writer AI — 構造化データ + RAG 文脈から日本語ビジネス文章を生成
-        _set_status(step=f"[2/3]  レポート文章を生成中です... (Writer: {MODEL_WRITER})\n"
+        _set_status(step=f"[2/3]  レポート文章を生成中です... (Writer: {used_writer})\n"
                          "       CPU 推論のため数分かかります。このまましばらくお待ちください。")
 
         def _on_writer_token(count: int):
-            _set_status(step=f"[2/3]  レポート文章を生成中です... (Writer: {MODEL_WRITER})\n"
+            _set_status(step=f"[2/3]  レポート文章を生成中です... (Writer: {used_writer})\n"
                              f"       生成中... {count} トークン生成済み")
 
         try:
             writer_raw = generate(
-                build_writer_prompt(analyst_data, summary_data["raw_summary"], rag_context),
-                model=MODEL_WRITER,
+                build_writer_prompt(
+                    analyst_data, summary_data["raw_summary"],
+                    rag_context, extra_context,
+                ),
+                model=used_writer,
                 on_token=_on_writer_token,
             )
             summary_text, analysis_text = parse_writer_response(writer_raw)
@@ -172,6 +189,14 @@ def _run_generation(
             _set_status(error=f"PPTX 生成に失敗しました: {e}")
             return
 
+        # H-4: 履歴に追記
+        append_history(
+            job_id=job_id,
+            original_filename=excel_filename,
+            output_path=output_path,
+            analyst_model=used_analyst,
+            writer_model=used_writer,
+        )
         _set_status(step="完了しました！", done=True, output_path=output_path)
 
     except Exception as e:
@@ -194,6 +219,11 @@ async def generate_report(
     slide_rep_table:     bool            = Form(False),
     slide_chart:         bool            = Form(True),
     chart_product_type:  str             = Form("bar"),
+    analyst_model:       str             = Form(""),
+    writer_model:        str             = Form(""),
+    date_from:           str             = Form(""),
+    date_to:             str             = Form(""),
+    extra_context:       str             = Form("", description="追加プロンプト（オプション）"),
 ):
     """処理をバックグラウンドスレッドで開始し、即座に返す。"""
     # 処理中の場合は 409 を返す（二重投入防止）
@@ -225,11 +255,14 @@ async def generate_report(
         "chart_product_type":  chart_product_type,
     }
 
-    _set_status(step="[1/3]  Excel / CSV を読み込んでいます...", done=False, error="", output_path="")
+    _set_status(step="[0/3]  Ollama の接続とモデルを確認しています...", done=False, error="", output_path="")
     _executor.submit(
         _run_generation,
         excel_data, template_data, excel_filename,
         template_name, slide_options,
+        analyst_model, writer_model,
+        date_from, date_to,
+        extra_context,
     )
 
     return {"status": "started"}

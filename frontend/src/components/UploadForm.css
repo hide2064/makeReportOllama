@@ -10,10 +10,10 @@
   gap: 8px;
 }
 
-.form-group label {
+.form-group > label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
 }
 
 .file-row {
@@ -24,7 +24,7 @@
 
 .file-name {
   font-size: 0.88rem;
-  color: #6b7280;
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -33,28 +33,23 @@
 
 .btn-secondary {
   padding: 8px 16px;
-  border: 1.5px solid #6366f1;
+  border: 1.5px solid var(--primary);
   border-radius: 6px;
-  background: #fff;
-  color: #6366f1;
+  background: var(--surface);
+  color: var(--primary);
   font-size: 0.88rem;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
 }
-.btn-secondary:hover:not(:disabled) {
-  background: #eef2ff;
-}
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn-secondary:hover:not(:disabled) { background: var(--primary-light); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
-  background: #4f46e5;
+  background: var(--primary);
   color: #fff;
   font-size: 1rem;
   font-weight: 600;
@@ -62,70 +57,50 @@
   transition: background 0.15s;
   align-self: flex-start;
 }
-.btn-primary:hover:not(:disabled) {
-  background: #4338ca;
-}
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── テンプレートタブ ── */
 .template-tabs {
   display: flex;
-  gap: 0;
   border-radius: 6px;
   overflow: hidden;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border-input);
   width: fit-content;
 }
 
 .tab-btn {
   padding: 7px 16px;
   border: none;
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--surface-sub);
+  color: var(--text-muted);
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.tab-btn:not(:last-child) {
-  border-right: 1.5px solid #d1d5db;
-}
-.tab-btn.active {
-  background: #4f46e5;
-  color: #fff;
-  font-weight: 600;
-}
-.tab-btn:hover:not(.active):not(:disabled) {
-  background: #e5e7eb;
-}
-.tab-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.tab-btn:not(:last-child) { border-right: 1.5px solid var(--border-input); }
+.tab-btn.active { background: var(--primary); color: #fff; font-weight: 600; }
+.tab-btn:hover:not(.active):not(:disabled) { background: var(--hover-bg); }
+.tab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .template-select {
   padding: 7px 12px;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border-input);
   border-radius: 6px;
   font-size: 0.88rem;
-  color: #374151;
-  background: #fff;
+  color: var(--text);
+  background: var(--input-bg);
   width: 100%;
   max-width: 360px;
   cursor: pointer;
 }
-.template-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.template-select:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── スライドオプション ── */
-.slide-options label:first-child {
+.slide-options > label:first-child {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
 }
 
 .options-row {
@@ -140,13 +115,13 @@
   align-items: center;
   gap: 6px;
   font-size: 0.88rem;
-  color: #374151;
+  color: var(--text);
   cursor: pointer;
 }
 .checkbox-label input,
 .radio-label input {
   cursor: pointer;
-  accent-color: #4f46e5;
+  accent-color: var(--primary);
 }
 
 .chart-type-row {
@@ -154,7 +129,168 @@
   align-items: center;
   gap: 12px;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-top: 6px;
   padding-left: 4px;
+}
+
+/* ── H-1: ドロップゾーン ── */
+.drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-input);
+  border-radius: 10px;
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--surface-sub);
+  min-height: 72px;
+}
+.drop-zone:hover { border-color: var(--primary); background: var(--primary-light); }
+.drop-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+.drop-zone.has-file  { border-style: solid; border-color: var(--primary); background: var(--primary-light); }
+
+.drop-zone-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-placeholder);
+  font-size: 0.88rem;
+}
+.drop-zone-icon { font-size: 1.6rem; }
+.drop-zone-sub  { font-size: 0.76rem; color: var(--border-input); }
+
+.drop-zone-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.drop-zone-filename {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drop-zone-clear {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--hover-bg);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s;
+}
+.drop-zone-clear:hover { background: var(--error-bg); color: var(--error); }
+
+/* ── H-2: プレビューメッセージ ── */
+.preview-loading { font-size: 0.82rem; color: var(--text-placeholder); margin-top: 6px; }
+.preview-error   { font-size: 0.82rem; color: var(--error);            margin-top: 6px; }
+
+/* ── H-5: 日付フィルター ── */
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.date-input {
+  padding: 7px 10px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--input-bg);
+}
+.date-input:disabled { opacity: 0.5; }
+.date-sep  { font-size: 0.88rem; color: var(--text-muted); }
+.date-error { font-size: 0.82rem; color: var(--error); margin-top: 4px; }
+
+/* ── H-3: モデル選択 ── */
+.model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.model-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  width: 56px;
+  flex-shrink: 0;
+}
+.model-select {
+  padding: 6px 10px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--input-bg);
+  cursor: pointer;
+  flex: 1;
+  max-width: 260px;
+}
+.model-select:disabled { opacity: 0.5; }
+.model-fixed { font-size: 0.85rem; color: var(--text-placeholder); }
+
+/* ── 追加プロンプト ── */
+.label-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.badge-optional {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface-sub);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  letter-spacing: 0.04em;
+}
+
+.extra-context-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--input-bg);
+  resize: vertical;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.extra-context-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+.extra-context-input:disabled { opacity: 0.5; }
+.extra-context-input::placeholder { color: var(--text-placeholder); }
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
 }

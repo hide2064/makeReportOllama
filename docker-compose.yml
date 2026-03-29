@@ -1,0 +1,53 @@
+services:
+
+  # ── Ollama (GPU がある場合は deploy.resources を有効化) ──
+  ollama:
+    image: ollama/ollama:latest
+    container_name: makeReportOllama-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    # GPU を使う場合は下記コメントを外す
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── バックエンド (FastAPI) ──────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: makeReportOllama-backend
+    environment:
+      - LOG_LEVEL=INFO
+      # コンテナ内から Ollama に接続するためホスト名を上書き
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./data:/app/../data
+      - ./output:/app/../output
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  # ── フロントエンド (Nginx + Vite build) ────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: makeReportOllama-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

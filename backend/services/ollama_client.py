@@ -1,6 +1,6 @@
 """
 ollama_client.py
-Ollama API (http://localhost:11434) とのやり取りを担う。
+Ollama API とのやり取りを担う。
 
 Phase 2 構成: 2モデル パイプライン
   Analyst AI (qwen2.5:3b) : 数値データ → 構造化 JSON
@@ -14,14 +14,55 @@ from collections.abc import Callable
 
 import httpx
 
+from config import (
+    MODEL_ANALYST,
+    MODEL_WRITER,
+    OLLAMA_CONNECT_TIMEOUT,
+    OLLAMA_GENERATE,
+    OLLAMA_GENERATE_TIMEOUT,
+    OLLAMA_TAGS_URL,
+)
+
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL      = "http://localhost:11434/api/generate"
-REQUEST_TIMEOUT = 1200  # seconds (20分)
+# 外部から参照できるよう再エクスポート
+__all__ = [
+    "MODEL_ANALYST",
+    "MODEL_WRITER",
+    "check_ollama",
+    "generate",
+    "build_analyst_prompt",
+    "parse_analyst_json",
+    "build_writer_prompt",
+    "parse_writer_response",
+]
 
-# ── モデル定義 ────────────────────────────────────────────────
-MODEL_ANALYST = "qwen2.5:3b"   # 数値抽出・JSON 構造化（軽量・高速）
-MODEL_WRITER  = "qwen3:8b"     # 日本語ビジネス文章生成
+
+def check_ollama(model: str) -> None:
+    """
+    Ollama の起動確認とモデル存在確認を行う。
+    問題があれば RuntimeError を即座に送出する（20分タイムアウトを防ぐ事前チェック）。
+    """
+    try:
+        resp = httpx.get(OLLAMA_TAGS_URL, timeout=OLLAMA_CONNECT_TIMEOUT)
+        resp.raise_for_status()
+        tags = resp.json()
+    except httpx.ConnectError:
+        raise RuntimeError(
+            "Ollama に接続できません。http://localhost:11434 が起動しているか確認してください。"
+        )
+    except Exception as e:
+        raise RuntimeError(f"Ollama の状態確認に失敗しました: {e}")
+
+    # モデル名の先頭部分で前方一致チェック（タグなし/タグあり両対応）
+    available = [m.get("name", "") for m in tags.get("models", [])]
+    base_name = model.split(":")[0]
+    if not any(m == model or m.startswith(base_name + ":") for m in available):
+        raise RuntimeError(
+            f"モデル '{model}' が Ollama にありません。\n"
+            f"利用可能: {available}\n"
+            f"`ollama pull {model}` で取得してください。"
+        )
 
 
 # ── 汎用生成関数 ──────────────────────────────────────────────
@@ -46,8 +87,13 @@ def generate(
         chunks: list[str] = []
         token_count = 0
         with httpx.stream(
-            "POST", OLLAMA_URL, json=payload,
-            timeout=httpx.Timeout(connect=30.0, read=REQUEST_TIMEOUT, write=30.0, pool=5.0),
+            "POST", OLLAMA_GENERATE, json=payload,
+            timeout=httpx.Timeout(
+                connect=OLLAMA_CONNECT_TIMEOUT,
+                read=OLLAMA_GENERATE_TIMEOUT,
+                write=30.0,
+                pool=5.0,
+            ),
         ) as resp:
             resp.raise_for_status()
             for raw_line in resp.iter_lines():
@@ -124,7 +170,6 @@ def parse_analyst_json(response: str) -> dict:
     if md_match:
         json_str = md_match.group(1)
     else:
-        # 最初の { から最後の } までを抽出
         brace_match = re.search(r"\{.*\}", response, re.DOTALL)
         json_str = brace_match.group(0) if brace_match else "{}"
 
@@ -136,11 +181,16 @@ def parse_analyst_json(response: str) -> dict:
 
 
 # ── Writer AI (qwen3:8b) ──────────────────────────────────────
-def build_writer_prompt(analyst_data: dict, raw_summary: str, rag_context: str = "") -> str:
+def build_writer_prompt(
+    analyst_data: dict,
+    raw_summary: str,
+    rag_context: str = "",
+    extra_context: str = "",
+) -> str:
     """
     Analyst の構造化データを元に日本語ビジネス文章を生成するプロンプト。
-    rag_context が渡された場合は過去レポートの文脈として末尾に追加する。
-    analyst_data が空の場合は raw_summary をフォールバックとして使用する。
+    rag_context   : 過去レポートからの参考情報 (RAG)
+    extra_context : ユーザーが入力した追加プロンプト
     """
     if analyst_data:
         data_section = f"【分析データ (JSON)】\n{json.dumps(analyst_data, ensure_ascii=False, indent=2)}"
@@ -155,45 +205,42 @@ def build_writer_prompt(analyst_data: dict, raw_summary: str, rag_context: str =
         f"{rag_context}"
     ) if rag_context else ""
 
+    extra_section = (
+        f"\n\n【追加指示・コンテキスト】\n"
+        f"以下のユーザー指示を優先的に反映してレポートを作成してください。\n"
+        f"{extra_context}"
+    ) if extra_context.strip() else ""
+
     return (
-        "あなたは優秀なビジネスアナリストです。\n"
-        "以下の売上分析データを元に、経営陣向けの報告書用テキストを日本語で作成してください。\n"
-        "各セクションは300字程度、箇条書きを使わず文章形式で記述してください。\n\n"
+        "あなたはトップコンサルティングファームのシニアアナリストです。\n"
+        "以下の売上分析データを元に、経営陣向けの報告書用テキストを日本語で作成してください。\n\n"
+        "【文章スタイル（厳守）】\n"
+        "- 各セクション 150〜200字以内、簡潔に要点のみ記述\n"
+        "- 箇条書き（・ または 数字+.）を積極的に使う（1セクションあたり 3〜5項目）\n"
+        "- 数値は必ず入れる（例: 売上 ¥XX万、前月比 +X%）\n"
+        "- 曖昧な表現・冗長な修飾語は排除する\n"
+        "- 結論ファースト（最初に結論、次に根拠・数値）\n\n"
         "【出力形式】\n"
         "---SUMMARY---\n"
-        "（今月の売上サマリーをここに記述）\n"
+        "（今期の売上サマリーを箇条書きでここに記述）\n"
         "---ANALYSIS---\n"
-        "（課題・所見と来月の改善策・方針をここに記述）\n\n"
+        "（課題・改善策・次期方針を箇条書きでここに記述）\n\n"
         f"{data_section}"
         f"{rag_section}"
+        f"{extra_section}"
     )
 
 
 def parse_writer_response(response: str) -> tuple[str, str]:
     """Writer AI のレスポンスからサマリーと分析テキストを分離する。"""
-    summary_text  = ""
-    analysis_text = ""
-
     if "---SUMMARY---" in response and "---ANALYSIS---" in response:
         parts         = response.split("---ANALYSIS---")
         summary_text  = parts[0].replace("---SUMMARY---", "").strip()
         analysis_text = parts[1].strip() if len(parts) > 1 else ""
     else:
-        # フォールバック: 前半をサマリー、後半を分析に使用
         logger.warning("Writer レスポンスにセクションマーカーなし。フォールバック分割を使用。")
         mid           = len(response) // 2
         summary_text  = response[:mid].strip()
         analysis_text = response[mid:].strip()
 
     return summary_text, analysis_text
-
-
-# ── 後方互換: 旧 combined プロンプト関数（テスト等で参照される場合のみ） ──
-def build_combined_prompt(raw_summary: str) -> str:
-    """後方互換用。新規コードは build_analyst_prompt / build_writer_prompt を使うこと。"""
-    return build_writer_prompt({}, raw_summary)
-
-
-def parse_combined_response(response: str) -> tuple[str, str]:
-    """後方互換用。新規コードは parse_writer_response を使うこと。"""
-    return parse_writer_response(response)

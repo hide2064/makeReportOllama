@@ -33,13 +33,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# ── カラーパレット ────────────────────────────────────────────────
-NAVY       = RGBColor(0x1B, 0x2E, 0x4C)
-NAVY2      = RGBColor(0x2C, 0x4A, 0x7A)
-GOLD       = RGBColor(0xC4, 0x97, 0x3E)
+# ── カラーパレット (エグゼクティブデザイン) ──────────────────────
+NAVY       = RGBColor(0x0A, 0x12, 0x28)   # C_INK: deepest navy (cover bg)
+NAVY2      = RGBColor(0x16, 0x32, 0x60)   # C_NAVY_MID: section headers
+GOLD       = RGBColor(0xD4, 0x94, 0x1A)   # C_GOLD: accent / highlights
+TEAL       = RGBColor(0x00, 0xA3, 0x9A)   # C_TEAL: secondary accent
 WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
-LIGHT_BLUE = RGBColor(0xE8, 0xEE, 0xF5)
-TEXT_DARK  = RGBColor(0x1A, 0x1A, 0x2E)
+LIGHT_BLUE = RGBColor(0xF6, 0xF8, 0xFC)   # C_OFFWHITE: slide backgrounds
+TEXT_DARK  = RGBColor(0x0A, 0x12, 0x28)   # same as NAVY for body text
 GRAY       = RGBColor(0x55, 0x65, 0x7A)
 
 # ── スライドサイズ (16:9 ワイド) ──────────────────────────────────
@@ -236,91 +237,113 @@ def _add_chart_slide(prs, monthly_totals: dict, product_totals: dict,
     _slide_header(slide, "売上推移グラフ")
     _slide_footer(slide)
 
-    # ── matplotlib 描画 ──────────────────────────────────────
+    # ── matplotlib 描画（シンプル・コンサル風） ──────────────
     has_margin = bool(monthly_margin and any(
         v == v for v in monthly_margin.values()  # NaN 除外チェック
     ))
     fig, axes = plt.subplots(
         1, 2,
-        figsize=(12.8, 4.8),
+        figsize=(13.0, 4.6),
         gridspec_kw={"width_ratios": [6, 4]},
     )
-    fig.patch.set_facecolor("#FAFBFC")
+    fig.patch.set_facecolor("#FFFFFF")
+
+    C_NAVY = "#0A1228"
+    C_GOLD = "#D4941A"
+    C_TEAL = "#00A39A"
+    C_GRAY = "#D1D5DB"
 
     # 左: 月次売上バーチャート ─────────────────────────────────
-    ax1 = axes[0]
-    months  = list(monthly_totals.keys())
-    vals    = [monthly_totals[m] // 10_000 for m in months]
-    x_pos   = list(range(len(months)))
-    xlabels = [m[-5:] for m in months]   # "2024-01" → "4-01" は短すぎるので全体
+    ax1    = axes[0]
+    months = list(monthly_totals.keys())
+    vals   = [monthly_totals[m] // 10_000 for m in months]
+    x_pos  = list(range(len(months)))
 
-    bars = ax1.bar(x_pos, vals, color="#1B2E4C", edgecolor="#C4973E",
-                   linewidth=0.5, zorder=3)
+    # ネイビー単色バー、エッジなし
+    ax1.bar(x_pos, vals, color=C_NAVY, width=0.6, zorder=3)
     ax1.set_xticks(x_pos)
-    ax1.set_xticklabels(months, rotation=45, ha="right", fontsize=7.5)
-    ax1.set_ylabel("売上金額（万円）", fontsize=9)
-    ax1.set_title("月次売上推移", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
+    ax1.set_xticklabels(months, rotation=45, ha="right", fontsize=7)
+    ax1.set_ylabel("（万円）", fontsize=8, color="#555")
+    ax1.set_title("月次売上推移", fontsize=10, fontweight="bold",
+                  color=C_NAVY, pad=10, loc="left")
     ax1.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax1.grid(axis="y", alpha=0.3, zorder=0)
-    ax1.set_facecolor("#F8F9FA")
-    ax1.spines[["top", "right"]].set_visible(False)
+    # グリッドは薄い水平線のみ
+    ax1.yaxis.grid(True, linestyle="--", linewidth=0.5, color=C_GRAY, zorder=0)
+    ax1.set_axisbelow(True)
+    ax1.set_facecolor("#FFFFFF")
+    ax1.spines[["top", "right", "left"]].set_visible(False)
+    ax1.tick_params(axis="both", length=0)
+
+    # 最高値バーにゴールドマーク
+    if vals:
+        max_idx = vals.index(max(vals))
+        ax1.patches[max_idx].set_facecolor(C_GOLD)
+        ax1.text(max_idx, vals[max_idx] + max(vals) * 0.01,
+                 f"{vals[max_idx]:,}", ha="center", va="bottom",
+                 fontsize=7.5, fontweight="bold", color=C_GOLD)
 
     # 利益率ライン（オプション）
     if has_margin:
         ax1r = ax1.twinx()
         margin_vals = [monthly_margin.get(m) for m in months]
-        ax1r.plot(x_pos, margin_vals, color="#C4973E", marker="o",
-                  markersize=4, linewidth=1.5, label="利益率(%)", zorder=4)
-        ax1r.set_ylabel("利益率（%）", fontsize=8, color="#C4973E")
-        ax1r.tick_params(axis="y", labelcolor="#C4973E")
+        ax1r.plot(x_pos, margin_vals, color=C_TEAL, marker="o",
+                  markersize=3.5, linewidth=1.5, zorder=4)
+        ax1r.set_ylabel("利益率(%)", fontsize=8, color=C_TEAL)
+        ax1r.tick_params(axis="y", labelcolor=C_TEAL, length=0, labelsize=7.5)
         ax1r.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:.0f}%"))
         ax1r.set_ylim(0, 100)
-        ax1r.spines[["top"]].set_visible(False)
+        ax1r.spines[["top", "right"]].set_visible(False)
 
     # 右: 商品別売上グラフ ─────────────────────────────────────
-    ax2    = axes[1]
-    prods  = list(product_totals.keys())[:8]
+    ax2   = axes[1]
+    prods = list(product_totals.keys())[:6]   # 上位6件に絞り見やすく
     p_vals = [product_totals[p] // 10_000 for p in prods]
-    palette = ["#1B2E4C", "#2C4A7A", "#C4973E", "#1A56A0",
-               "#8B5CF6", "#0E9F6E", "#CC2828", "#556578"]
-    colors2 = palette[:len(prods)]
 
     if product_chart_type == "pie":
-        # ドーナツ円グラフ
+        # シンプルドーナツ: ネイビー系グラデーション2色 + ゴールド
+        pie_colors = [C_NAVY, "#163260", C_GOLD, C_TEAL, "#556578", "#9CA3AF"][:len(prods)]
         wedges, _, autotexts = ax2.pie(
-            p_vals, labels=None, colors=colors2,
-            autopct="%1.1f%%", startangle=90, pctdistance=0.78,
-            wedgeprops={"width": 0.55, "edgecolor": "white", "linewidth": 1.5},
+            p_vals, labels=None, colors=pie_colors[:len(prods)],
+            autopct="%1.0f%%", startangle=90, pctdistance=0.80,
+            wedgeprops={"width": 0.50, "edgecolor": "white", "linewidth": 2},
         )
         for at in autotexts:
             at.set_fontsize(7.5)
-        ax2.legend(wedges, prods, loc="lower center", bbox_to_anchor=(0.5, -0.22),
-                   ncol=2, fontsize=7.5, frameon=False)
-        ax2.set_title("商品別売上構成", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
+            at.set_color("white")
+            at.set_fontweight("bold")
+        ax2.legend(wedges, prods, loc="lower center", bbox_to_anchor=(0.5, -0.18),
+                   ncol=2, fontsize=7, frameon=False)
+        ax2.set_title("商品別売上構成", fontsize=10, fontweight="bold",
+                      color=C_NAVY, pad=10, loc="left")
     else:
-        # 横棒グラフ（デフォルト）
-        ax2.barh(range(len(prods)), p_vals, color=colors2, edgecolor="white",
-                 linewidth=0.3, zorder=3)
+        # シンプル横棒: ネイビー単色 + 値ラベル
+        bar_colors = [C_GOLD if i == 0 else C_NAVY for i in range(len(prods))]
+        ax2.barh(range(len(prods)), p_vals, color=bar_colors,
+                 height=0.55, zorder=3)
         ax2.set_yticks(range(len(prods)))
-        ax2.set_yticklabels(prods, fontsize=9)
-        ax2.set_xlabel("売上金額（万円）", fontsize=9)
-        ax2.set_title("商品別売上構成", fontsize=11, fontweight="bold", color="#1B2E4C", pad=8)
+        ax2.set_yticklabels(prods, fontsize=8)
+        ax2.set_title("商品別売上構成", fontsize=10, fontweight="bold",
+                      color=C_NAVY, pad=10, loc="left")
         ax2.xaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-        ax2.grid(axis="x", alpha=0.3, zorder=0)
-        ax2.set_facecolor("#F8F9FA")
-        ax2.spines[["top", "right"]].set_visible(False)
+        ax2.xaxis.grid(True, linestyle="--", linewidth=0.5, color=C_GRAY, zorder=0)
+        ax2.set_axisbelow(True)
+        ax2.set_facecolor("#FFFFFF")
+        ax2.spines[["top", "right", "left"]].set_visible(False)
+        ax2.tick_params(axis="both", length=0)
         ax2.invert_yaxis()
-        # 棒の端に金額ラベル
+        # 各バーの端に値ラベル
+        max_v = max(p_vals) if p_vals else 1
         for bar, val in zip(ax2.patches, p_vals):
-            ax2.text(bar.get_width() + max(p_vals) * 0.01,
+            ax2.text(bar.get_width() + max_v * 0.02,
                      bar.get_y() + bar.get_height() / 2,
-                     f"{val:,}", va="center", ha="left", fontsize=8, color="#1B2E4C")
+                     f"{val:,}", va="center", ha="left",
+                     fontsize=7.5, color=C_NAVY)
 
-    plt.tight_layout(pad=1.5)
+    plt.tight_layout(pad=1.8)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=120, bbox_inches="tight",
-                facecolor="#FAFBFC")
+                facecolor="#F6F8FC")
     plt.close(fig)
     buf.seek(0)
 

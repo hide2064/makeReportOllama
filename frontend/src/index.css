@@ -2,9 +2,66 @@
   box-sizing: border-box;
 }
 
+/* ── カラートークン (ライトモード) ── */
+:root {
+  --bg:           #f3f4f6;
+  --surface:      #ffffff;
+  --surface-sub:  #f9fafb;
+  --text:         #111827;
+  --text-muted:   #6b7280;
+  --text-placeholder: #9ca3af;
+  --border:       #e5e7eb;
+  --border-input: #d1d5db;
+  --primary:      #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-light:#eef2ff;
+  --heading:      #1e1b4b;
+  --success:      #16a34a;
+  --success-bg:   #dcfce7;
+  --success-border:#bbf7d0;
+  --error:        #dc2626;
+  --error-bg:     #fee2e2;
+  --error-border: #fecaca;
+  --warn-bg:      #fef2f2;
+  --badge-bg:     #f3f4f6;
+  --input-bg:     #ffffff;
+  --hover-bg:     #f3f4f6;
+  --tag-bg:       #4f46e5;
+}
+
+/* ── カラートークン (ダークモード) ── */
+:root.dark {
+  --bg:           #0f172a;
+  --surface:      #1e293b;
+  --surface-sub:  #273548;
+  --text:         #f1f5f9;
+  --text-muted:   #94a3b8;
+  --text-placeholder: #64748b;
+  --border:       #334155;
+  --border-input: #475569;
+  --primary:      #6366f1;
+  --primary-dark: #4f46e5;
+  --primary-light:#1e1b4b;
+  --heading:      #c7d2fe;
+  --success:      #4ade80;
+  --success-bg:   #052e16;
+  --success-border:#166534;
+  --error:        #f87171;
+  --error-bg:     #2d0a0a;
+  --error-border: #7f1d1d;
+  --warn-bg:      #2d0a0a;
+  --badge-bg:     #273548;
+  --input-bg:     #1e293b;
+  --hover-bg:     #273548;
+  --tag-bg:       #4f46e5;
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.2s, color 0.2s;
 }
 
 #root {

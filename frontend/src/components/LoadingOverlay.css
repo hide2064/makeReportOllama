@@ -9,19 +9,20 @@
 }
 
 .overlay-box {
-  background: #fff;
+  background: var(--surface);
   border-radius: 12px;
   padding: 40px 48px;
   text-align: center;
   max-width: 360px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
 }
 
 .spinner {
   width: 56px;
   height: 56px;
-  border: 6px solid #e0e7ff;
-  border-top-color: #4f46e5;
+  border: 6px solid var(--primary-light);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
   margin: 0 auto 20px;
@@ -34,16 +35,16 @@
 .overlay-message {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1e1b4b;
+  color: var(--heading);
   margin: 0 0 8px;
 }
 
 .overlay-step {
   font-size: 0.95rem;
-  color: #1e1b4b;
+  color: var(--heading);
   font-weight: 600;
   white-space: pre-line;
-  background: #eef2ff;
+  background: var(--primary-light);
   border-radius: 6px;
   padding: 10px 14px;
   margin: 0 0 12px;
@@ -53,7 +54,7 @@
 
 .overlay-sub {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.6;
   margin: 0;
 }

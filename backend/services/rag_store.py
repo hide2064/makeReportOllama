@@ -17,17 +17,27 @@ import chromadb
 import httpx
 from pptx import Presentation
 
+from config import (
+    CHROMA_DIR,
+    MODEL_EMBED,
+    OLLAMA_EMBED_URL,
+    OLLAMA_EMBED_TIMEOUT,
+    RAG_COLLECTION,
+    RAG_MAX_CHUNKS,
+    RAG_MAX_CTX_CHARS,
+    RAG_MIN_CHUNK,
+    RAG_SIM_THRESHOLD,
+)
+
 logger = logging.getLogger(__name__)
 
-# ── 定数 ────────────────────────────────────────────────────
-CHROMA_DIR     = Path(__file__).parent.parent.parent / "data" / "chroma_db"
-COLLECTION_NAME = "past_reports"
-EMBED_MODEL    = "nomic-embed-text"
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
-EMBED_TIMEOUT  = 60   # seconds
-MAX_CHUNKS     = 5    # 検索で返す最大チャンク数
-MAX_CTX_CHARS  = 1_500  # Writer に渡す合計文字数上限
-MIN_CHUNK_CHARS = 30   # これ以下のチャンクは保存しない
+# ローカルエイリアス（後方互換）
+COLLECTION_NAME = RAG_COLLECTION
+EMBED_MODEL     = MODEL_EMBED
+EMBED_TIMEOUT   = OLLAMA_EMBED_TIMEOUT
+MAX_CHUNKS      = RAG_MAX_CHUNKS
+MAX_CTX_CHARS   = RAG_MAX_CTX_CHARS
+MIN_CHUNK_CHARS = RAG_MIN_CHUNK
 
 
 # ── ChromaDB クライアント (遅延初期化) ─────────────────────
@@ -166,7 +176,7 @@ def search_context(query: str, n_results: int = MAX_CHUNKS) -> str:
         results["distances"][0],
     ):
         similarity = 1 - dist   # cosine distance → similarity
-        if similarity < 0.3:    # 類似度が低すぎるものは除外
+        if similarity < RAG_SIM_THRESHOLD:
             continue
         snippet = doc[:300]     # 1チャンク最大 300 字
         chunks_out.append(
@@ -198,6 +208,27 @@ def list_registered() -> list[dict]:
             seen[fid] = {"filename": meta["filename"], "file_id": fid, "chunks": 0}
         seen[fid]["chunks"] += 1
     return list(seen.values())
+
+
+# ── チャンク取得 ─────────────────────────────────────────────
+def get_chunks_for_file(file_id: str) -> list[dict] | None:
+    """指定した file_id のチャンク一覧をスライド順で返す。存在しない場合は None。"""
+    col = _get_collection()
+    existing = col.get(
+        where={"file_id": file_id},
+        include=["documents", "metadatas"],
+    )
+    if not existing["ids"]:
+        return None
+    chunks = []
+    for chunk_id, doc, meta in zip(existing["ids"], existing["documents"], existing["metadatas"]):
+        chunks.append({
+            "id": chunk_id,
+            "text": doc,
+            "chunk_idx": meta.get("chunk_idx", 0),
+        })
+    chunks.sort(key=lambda x: x["chunk_idx"])
+    return chunks
 
 
 # ── ファイル削除 ─────────────────────────────────────────────

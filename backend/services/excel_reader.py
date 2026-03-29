@@ -11,7 +11,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def read_and_summarize(file_path: str) -> dict:
+def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -> dict:
     """
     Excel (.xlsx) または CSV (.csv) を読み込み、Ollama に渡すための集計サマリーを返す。
 
@@ -53,6 +53,14 @@ def read_and_summarize(file_path: str) -> dict:
         raise ValueError(f"必須列が不足しています: {missing}  (必須: {sorted(required_cols)})")
 
     df["日付"] = pd.to_datetime(df["日付"])
+
+    # 分析期間フィルター
+    if date_from:
+        df = df[df["日付"] >= pd.Timestamp(date_from)]
+    if date_to:
+        df = df[df["日付"] <= pd.Timestamp(date_to)]
+    if df.empty:
+        raise ValueError("指定された期間にデータが存在しません。日付範囲を確認してください。")
 
     total_amount = int(df["売上金額"].sum())
     total_qty    = int(df["数量"].sum())
