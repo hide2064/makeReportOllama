@@ -199,17 +199,19 @@ def build_writer_prompt(
         data_section = f"【売上データ】\n{raw_summary}"
 
     rag_section = (
-        f"\n【過去レポートからの参考情報】\n"
-        f"以下は類似する過去の報告書から抜粋した文脈です。"
-        f"傾向の継続・改善状況・前回との差分を意識して文章を構成してください。\n"
+        f"\n【参考情報（過去レポート）】\n"
+        f"以下は類似する過去の報告書から抜粋した参考文脈です（補助情報として活用すること）。\n"
         f"{rag_context}\n"
     ) if rag_context else ""
 
-    # extra_context はスタイル指示の直後・出力フォーマットの前に置く
-    # → LLM が出力形式を決定する前に読むため、確実に反映される
+    # extra_context はプロンプト末尾（RAG の後）に置く
+    # → LLM の直近バイアスにより最後に読んだ指示が最も強く反映される
+    # → RAG より extra_context を確実に優先させるための配置
     extra_section = (
-        f"【最優先追加指示】※以下の指示をサマリー・分析の両セクションに必ず反映すること\n"
-        f"{extra_context.strip()}\n\n"
+        f"\n【最優先追加指示 ★必読★】\n"
+        f"以下の指示は上記の参考情報・スタイル指示より優先する。\n"
+        f"サマリー・分析の両セクションに必ず具体的に反映すること。\n"
+        f"{extra_context.strip()}\n"
     ) if extra_context.strip() else ""
 
     return (
@@ -221,7 +223,6 @@ def build_writer_prompt(
         "- 数値は必ず入れる（例: 売上 ¥XX万、前月比 +X%）\n"
         "- 曖昧な表現・冗長な修飾語は排除する\n"
         "- 結論ファースト（最初に結論、次に根拠・数値）\n\n"
-        f"{extra_section}"
         "【出力形式】\n"
         "---SUMMARY---\n"
         "（今期の売上サマリーを箇条書きでここに記述）\n"
@@ -229,6 +230,7 @@ def build_writer_prompt(
         "（課題・改善策・次期方針を箇条書きでここに記述）\n\n"
         f"{data_section}\n"
         f"{rag_section}"
+        f"{extra_section}"
     )
 
 
