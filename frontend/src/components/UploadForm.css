@@ -294,3 +294,90 @@
   color: var(--text-muted);
   margin: 0;
 }
+
+/* ── B-6: テンプレート管理 ── */
+.extra-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.template-load-select {
+  padding: 4px 10px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  cursor: pointer;
+  max-width: 200px;
+}
+.template-load-select:disabled { opacity: 0.5; }
+
+.extra-context-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-save-template {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.btn-save-template:hover:not(:disabled) { background: var(--primary); color: #fff; }
+.btn-save-template:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.template-item-load {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-sub);
+  border: none;
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.template-item-load:hover:not(:disabled) { background: var(--primary-light); color: var(--primary); }
+.template-item-load:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.template-item-del {
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.template-item-del:hover:not(:disabled) { background: var(--error-bg); color: var(--error); }
+.template-item-del:disabled { opacity: 0.5; cursor: not-allowed; }

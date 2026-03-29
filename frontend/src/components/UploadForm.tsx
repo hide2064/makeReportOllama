@@ -18,11 +18,28 @@ export interface GenerateParams {
   extraContext:      string
 }
 
+interface ChartData {
+  product_totals: Record<string, number>
+  monthly_totals: Record<string, number>
+  total_amount:   number
+  total_qty:      number
+  period:         string
+}
+
 interface PreviewData {
   columns:      string[]
   rows:         unknown[][]
   missing_cols: string[]
+  chart_data:   ChartData | null
 }
+
+interface ContextTemplate {
+  id:   string
+  name: string
+  text: string
+}
+
+const TEMPLATES_KEY = 'extra_context_templates'
 
 interface Props {
   onGenerate: (params: GenerateParams) => void
@@ -55,6 +72,37 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
 
   // 追加プロンプト
   const [extraContext, setExtraContext] = useState<string>('')
+
+  // B-6: テンプレート管理
+  const [savedTemplates, setSavedTemplates] = useState<ContextTemplate[]>(() => {
+    try {
+      const raw = localStorage.getItem(TEMPLATES_KEY)
+      return raw ? (JSON.parse(raw) as ContextTemplate[]) : []
+    } catch {
+      return []
+    }
+  })
+
+  const saveTemplate = () => {
+    const name = window.prompt('テンプレート名を入力してください')
+    if (!name || !extraContext.trim()) return
+    const newTpl: ContextTemplate = { id: Date.now().toString(), name, text: extraContext }
+    const updated = [...savedTemplates, newTpl]
+    setSavedTemplates(updated)
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(updated))
+  }
+
+  const loadTemplate = (id: string) => {
+    const tpl = savedTemplates.find(t => t.id === id)
+    if (tpl) setExtraContext(tpl.text)
+  }
+
+  const deleteTemplate = (id: string) => {
+    if (!window.confirm('このテンプレートを削除しますか？')) return
+    const updated = savedTemplates.filter(t => t.id !== id)
+    setSavedTemplates(updated)
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(updated))
+  }
 
   // H-2: プレビュー
   const [previewData,    setPreviewData]    = useState<PreviewData | null>(null)
@@ -227,6 +275,7 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
             columns={previewData.columns}
             rows={previewData.rows}
             missingCols={previewData.missing_cols}
+            chartData={previewData.chart_data}
           />
         )}
       </div>
@@ -359,10 +408,25 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
 
       {/* ── 追加プロンプト ── */}
       <div className="form-group">
-        <label className="label-with-badge">
-          追加プロンプト
-          <span className="badge-optional">任意</span>
-        </label>
+        <div className="extra-label-row">
+          <label className="label-with-badge">
+            追加プロンプト
+            <span className="badge-optional">任意</span>
+          </label>
+          {savedTemplates.length > 0 && (
+            <select
+              className="template-load-select"
+              defaultValue=""
+              onChange={e => { if (e.target.value) loadTemplate(e.target.value); e.target.value = '' }}
+              disabled={disabled}
+            >
+              <option value="" disabled>テンプレートを読込...</option>
+              {savedTemplates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <textarea
           className="extra-context-input"
           rows={3}
@@ -371,7 +435,43 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
           onChange={e => setExtraContext(e.target.value)}
           disabled={disabled}
         />
-        <p className="field-hint">ここに入力した内容はAIへの追加指示として反映されます。</p>
+        <div className="extra-context-footer">
+          <p className="field-hint">ここに入力した内容はAIへの追加指示として反映されます。</p>
+          <button
+            type="button"
+            className="btn-save-template"
+            onClick={saveTemplate}
+            disabled={disabled || !extraContext.trim()}
+          >
+            ＋ テンプレートに保存
+          </button>
+        </div>
+        {savedTemplates.length > 0 && (
+          <div className="template-list">
+            {savedTemplates.map(t => (
+              <div key={t.id} className="template-item">
+                <button
+                  type="button"
+                  className="template-item-load"
+                  onClick={() => loadTemplate(t.id)}
+                  disabled={disabled}
+                  title={t.text}
+                >
+                  {t.name}
+                </button>
+                <button
+                  type="button"
+                  className="template-item-del"
+                  onClick={() => deleteTemplate(t.id)}
+                  disabled={disabled}
+                  title="削除"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button type="submit" className="btn-primary" disabled={disabled || !canSubmit}>

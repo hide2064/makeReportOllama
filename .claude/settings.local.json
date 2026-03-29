@@ -27,7 +27,11 @@
       "Bash(grep:*)",
       "Bash(cmd.exe /c \"taskkill /F /IM python.exe /T 2>nul; exit 0\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(PYTHONUTF8=1 ../.venv/Scripts/python -c \":*)",
+      "Bash(xargs -I{} cmd.exe /c 'taskkill /PID {} /F')",
+      "Bash(cmd.exe /c \"start makeReportOllama-Backend /min cmd /c cd /d C:/Work/makeReportOllama/backend && C:/Work/makeReportOllama/.venv/Scripts/python -m uvicorn main:app --host 0.0.0.0 --port 8000\")"
     ]
   }
 }

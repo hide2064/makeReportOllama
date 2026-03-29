@@ -1,0 +1,120 @@
+.slide-preview {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.slide-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--surface-sub);
+  border-bottom: 1px solid var(--border);
+}
+
+.slide-preview-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin: 0;
+}
+
+.slide-preview-close {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.slide-preview-close:hover { background: var(--hover-bg); }
+
+.slide-preview-list {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+/* ── スライドカード ── */
+.slide-card {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  width: 220px;
+  min-height: 140px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--surface);
+  transition: box-shadow 0.15s;
+}
+.slide-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.slide-card-num {
+  flex-shrink: 0;
+  width: 28px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.slide-card-table .slide-card-num { background: var(--text-muted); }
+.slide-card-chart .slide-card-num  { background: var(--success, #16a34a); }
+
+.slide-card-body {
+  flex: 1;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.slide-card-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slide-card-indicator {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+.slide-card-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.slide-card-text {
+  font-size: 0.72rem;
+  color: var(--text);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
