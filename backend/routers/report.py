@@ -128,6 +128,12 @@ def _run_generation(
             _set_job(job_id, error=str(e))
             return
 
+        # extra_context の受信確認ログ
+        if extra_context.strip():
+            logger.info(f"extra_context 受信 ({len(extra_context)}字): {extra_context[:200]}")
+        else:
+            logger.info("extra_context: なし（空）")
+
         # Step 2a: Analyst AI
         _set_job(job_id,
                  step=f"[2/3]  売上データを解析中です... (Analyst: {used_analyst})\n"

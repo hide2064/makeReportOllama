@@ -204,19 +204,25 @@ def build_writer_prompt(
         f"{rag_context}\n"
     ) if rag_context else ""
 
-    # extra_context はプロンプト末尾（RAG の後）に置く
-    # → LLM の直近バイアスにより最後に読んだ指示が最も強く反映される
-    # → RAG より extra_context を確実に優先させるための配置
-    extra_section = (
-        f"\n【最優先追加指示 ★必読★】\n"
-        f"以下の指示は上記の参考情報・スタイル指示より優先する。\n"
-        f"サマリー・分析の両セクションに必ず具体的に反映すること。\n"
+    # extra_context は冒頭と末尾の両方に配置する「挟み込み構造」
+    # ・冒頭: 役割定義の直後に置き、出力全体の方針として認識させる
+    # ・末尾: 直近バイアスで最終的な出力内容に反映させる
+    extra_intro = (
+        f"\n【今回のレポートで最優先すべき追加指示】\n"
+        f"{extra_context.strip()}\n"
+        f"上記指示をサマリー・分析の両セクションに必ず具体的に反映すること。\n"
+    ) if extra_context.strip() else ""
+
+    extra_tail = (
+        f"\n【最終確認: 追加指示の反映】\n"
+        f"以下の指示が出力に反映されているか必ず確認してから出力すること。\n"
         f"{extra_context.strip()}\n"
     ) if extra_context.strip() else ""
 
     return (
         "あなたはトップコンサルティングファームのシニアアナリストです。\n"
-        "以下の売上分析データを元に、経営陣向けの報告書用テキストを日本語で作成してください。\n\n"
+        "以下の売上分析データを元に、経営陣向けの報告書用テキストを日本語で作成してください。\n"
+        f"{extra_intro}\n"
         "【文章スタイル（厳守）】\n"
         "- 各セクション 150〜200字以内、簡潔に要点のみ記述\n"
         "- 箇条書き（・ または 数字+.）を積極的に使う（1セクションあたり 3〜5項目）\n"
@@ -230,7 +236,7 @@ def build_writer_prompt(
         "（課題・改善策・次期方針を箇条書きでここに記述）\n\n"
         f"{data_section}\n"
         f"{rag_section}"
-        f"{extra_section}"
+        f"{extra_tail}"
     )
 
 
