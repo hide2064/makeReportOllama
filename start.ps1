@@ -164,14 +164,13 @@ Start-Sleep -Seconds 1
 $pythonExe  = Join-Path $VENV 'Scripts\python.exe'
 $backendDir = Join-Path $ROOT 'backend'
 
-$psi = [System.Diagnostics.ProcessStartInfo]::new()
-$psi.FileName         = $pythonExe
-$psi.Arguments        = "-m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT"
-$psi.WorkingDirectory = $backendDir
-$psi.WindowStyle      = [System.Diagnostics.ProcessWindowStyle]::Minimized
-$psi.UseShellExecute  = $false
-$psi.EnvironmentVariables['CORS_ORIGINS'] = $env:CORS_ORIGINS
-[System.Diagnostics.Process]::Start($psi) | Out-Null
+$bp = @{
+    FilePath         = $pythonExe
+    ArgumentList     = "-m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT"
+    WorkingDirectory = $backendDir
+    WindowStyle      = 'Minimized'
+}
+Start-Process @bp
 
 Write-Host 'Waiting for backend to start...'
 if (-not (Wait-ForUrl $BACKEND_URL)) {
