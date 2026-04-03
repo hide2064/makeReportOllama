@@ -89,6 +89,26 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
         .to_string()
     )
 
+    # 事業部・課 別集計（列が存在する場合のみ）
+    by_division = ""
+    if "事業部" in df.columns:
+        by_division = (
+            df.groupby("事業部")["売上金額"]
+            .sum()
+            .sort_values(ascending=False)
+            .apply(lambda x: f"{x:,}円")
+            .to_string()
+        )
+    by_section = ""
+    if "課" in df.columns:
+        by_section = (
+            df.groupby("課")["売上金額"]
+            .sum()
+            .sort_values(ascending=False)
+            .apply(lambda x: f"{x:,}円")
+            .to_string()
+        )
+
     raw_summary = (
         f"集計期間: {period_start} ～ {period_end}\n"
         f"総売上金額: {total_amount:,}円\n"
@@ -97,6 +117,10 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
         f"【地域別売上】\n{by_region}\n\n"
         f"【担当者別売上】\n{by_rep}\n"
     )
+    if by_division:
+        raw_summary += f"\n【事業部別売上】\n{by_division}\n"
+    if by_section:
+        raw_summary += f"\n【課別売上】\n{by_section}\n"
 
     # ── グラフ・表用集計データ ────────────────────────────────────
     df["月"]    = df["日付"].dt.to_period("M").astype(str)
