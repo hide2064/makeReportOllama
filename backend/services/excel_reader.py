@@ -170,6 +170,24 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
             yoy_text = "【前年同期比】\n" + "\n".join(yoy_lines) + "\n"
             raw_summary = raw_summary + "\n" + yoy_text
 
+    # 予実比較（売上予定列がある場合のみ）
+    budget_by_product: dict | None = None
+    actual_vs_budget_text = ""
+    if "売上予定" in df.columns:
+        actual_s  = df.groupby("商品名")["売上金額"].sum()
+        budget_s  = df.groupby("商品名")["売上予定"].sum()
+        avb_lines = []
+        for prod in actual_s.index:
+            act = actual_s[prod]
+            bgt = budget_s.get(prod, 0)
+            if bgt > 0:
+                rate = act / bgt * 100
+                avb_lines.append(f"  {prod}: 実績 {act:,.0f}円 / 予定 {bgt:,.0f}円 ({rate:.1f}%)")
+        if avb_lines:
+            actual_vs_budget_text = "【予実比較（商品別）】\n" + "\n".join(avb_lines) + "\n"
+            raw_summary = raw_summary + "\n" + actual_vs_budget_text
+        budget_by_product = budget_s.sort_values(ascending=False).to_dict()
+
     logger.info("集計完了")
     return {
         "total_amount":             total_amount,
@@ -185,4 +203,5 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
         "quarterly_region_pivot":   quarterly_region_pivot,
         "quarterly_rep_pivot":      quarterly_rep_pivot,
         "monthly_margin":           monthly_margin,
+        "budget_by_product":        budget_by_product,
     }
