@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,   // 0.0.0.0 でリッスン → LAN 上の別 PC からもアクセス可能
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

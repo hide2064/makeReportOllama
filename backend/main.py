@@ -32,9 +32,24 @@ app = FastAPI(
 )
 
 # フロントエンド (Vite dev server) からのアクセスを許可
+# CORS_ORIGINS 環境変数でカンマ区切りに追加のオリジンを指定可能（例: LAN IP）
+# 未指定時は localhost のみ許可。"*" を指定すると全オリジン許可。
+_cors_env = os.environ.get("CORS_ORIGINS", "")
+_default_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+if _cors_env == "*":
+    _allow_origins     = ["*"]
+    _allow_credentials = False
+elif _cors_env:
+    _allow_origins     = _default_origins + [o.strip() for o in _cors_env.split(",") if o.strip()]
+    _allow_credentials = True
+else:
+    _allow_origins     = _default_origins
+    _allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

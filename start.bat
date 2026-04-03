@@ -14,6 +14,17 @@ set "OLLAMA_MODEL_EMBED=nomic-embed-text"
 set "OLLAMA_DEFAULT_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
 set "OLLAMA_EXE=ollama"
 
+:: LAN IP を取得して CORS_ORIGINS に追加（別 PC からのアクセスを許可）
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4"') do (
+    set "LAN_IP=%%a"
+    set "LAN_IP=!LAN_IP: =!"
+)
+if defined LAN_IP (
+    set "CORS_ORIGINS=http://!LAN_IP!:%FRONTEND_PORT%"
+) else (
+    set "CORS_ORIGINS="
+)
+
 echo ============================================================
 echo  makeReportOllama - Auto Start Script
 echo ============================================================
@@ -186,9 +197,13 @@ echo Frontend dependencies OK.
 :: [5/6] Start backend
 echo.
 echo [5/6] Starting backend server...
+if defined LAN_IP (
+    echo LAN IP detected: %LAN_IP% -- CORS_ORIGINS=%CORS_ORIGINS%
+    echo Access from other PCs: http://%LAN_IP%:%FRONTEND_PORT%
+)
 taskkill /fi "WINDOWTITLE eq makeReportOllama-Backend" /f >nul 2>&1
 timeout /t 1 /nobreak >nul
-start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT%"
+start "makeReportOllama-Backend" /min cmd /c "cd /d "%ROOT%backend" && set CORS_ORIGINS=%CORS_ORIGINS% && "%VENV%\Scripts\python" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT%"
 set /a "tries=0"
 :wait_backend
 timeout /t 2 /nobreak >nul
@@ -219,6 +234,7 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo  Ready! Opening browser at %FRONTEND_URL%
+if defined LAN_IP echo  From other PCs:  http://%LAN_IP%:%FRONTEND_PORT%
 echo ============================================================
 timeout /t 2 /nobreak >nul
 start "" "%FRONTEND_URL%"
