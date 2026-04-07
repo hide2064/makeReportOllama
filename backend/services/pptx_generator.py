@@ -498,6 +498,8 @@ def generate_pptx(
     do_chart            = opts.get("chart", True)
     chart_product_type  = opts.get("chart_product_type", "bar")
     do_multiyear_chart  = opts.get("multiyear_chart", False)
+    logger.info(f"slide_options: {opts}")
+    logger.info(f"do_multiyear_chart={do_multiyear_chart}, monthly_by_year keys={list(monthly_by_year.keys()) if monthly_by_year else None}")
 
     prs   = Presentation(template_path)
     today = date.today().strftime("%Y年%m月%d日")
