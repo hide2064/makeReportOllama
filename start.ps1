@@ -127,18 +127,25 @@ $pip = Join-Path $VENV 'Scripts\pip.exe'
 if ($LASTEXITCODE -ne 0) { Write-Fail 'pip install failed.' }
 Write-Ok 'Python venv ready.'
 
-# [4/6] Frontend npm install
-Write-Step '[4/6] Checking frontend dependencies...'
-$nodeModules = Join-Path $ROOT 'frontend\node_modules'
+# [4/6] Frontend npm install + build
+Write-Step '[4/6] Checking frontend dependencies and building...'
+$frontendDir = Join-Path $ROOT 'frontend'
+$nodeModules = Join-Path $frontendDir 'node_modules'
 if (-not (Test-Path $nodeModules)) {
     Write-Host 'Running npm install...'
-    Push-Location (Join-Path $ROOT 'frontend')
+    Push-Location $frontendDir
     npm install --silent
     $npmExit = $LASTEXITCODE
     Pop-Location
     if ($npmExit -ne 0) { Write-Fail 'npm install failed.' }
 }
-Write-Ok 'Frontend dependencies OK.'
+Write-Host 'Building frontend...'
+Push-Location $frontendDir
+npm run build
+$buildExit = $LASTEXITCODE
+Pop-Location
+if ($buildExit -ne 0) { Write-Fail 'npm run build failed.' }
+Write-Ok 'Frontend built OK.'
 
 # [5/6] Start backend
 Write-Step '[5/6] Starting backend server...'
