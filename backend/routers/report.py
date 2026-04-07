@@ -78,6 +78,7 @@ def _run_generation(
     date_from: str = "",
     date_to: str = "",
     extra_context: str = "",
+    monthly_by_year: Optional[dict] = None,
 ):
     # 待機キューから除去（実行開始）
     with _jobs_lock:
@@ -214,6 +215,7 @@ def _run_generation(
                 quarterly_region_pivot=summary_data.get("quarterly_region_pivot"),
                 quarterly_rep_pivot=summary_data.get("quarterly_rep_pivot"),
                 monthly_margin=summary_data.get("monthly_margin"),
+                monthly_by_year=summary_data.get("monthly_by_year"),
                 slide_options=slide_options,
             )
         except Exception as e:
@@ -258,11 +260,12 @@ async def generate_report(
     excel_file:          UploadFile           = File(..., description="売上データ Excel/CSV"),
     template_file:       Optional[UploadFile] = File(None, description="PPTX テンプレート"),
     template_name:       str                  = Form(""),
-    slide_product_table: bool                 = Form(True),
-    slide_region_table:  bool                 = Form(False),
-    slide_rep_table:     bool                 = Form(False),
-    slide_chart:         bool                 = Form(True),
-    chart_product_type:  str                  = Form("bar"),
+    slide_product_table:   bool                 = Form(True),
+    slide_region_table:    bool                 = Form(False),
+    slide_rep_table:       bool                 = Form(False),
+    slide_chart:           bool                 = Form(True),
+    chart_product_type:    str                  = Form("bar"),
+    slide_multiyear_chart: bool                 = Form(False),
     analyst_model:       str                  = Form(""),
     writer_model:        str                  = Form(""),
     date_from:           str                  = Form(""),
@@ -288,6 +291,7 @@ async def generate_report(
         "rep_table":          slide_rep_table,
         "chart":              slide_chart,
         "chart_product_type": chart_product_type,
+        "multiyear_chart":    slide_multiyear_chart,
     }
 
     with _jobs_lock:

@@ -9,8 +9,9 @@ export interface GenerateParams {
   slideProductTable: boolean
   slideRegionTable:  boolean
   slideRepTable:     boolean
-  slideChart:        boolean
-  chartProductType:  'bar' | 'pie'
+  slideChart:           boolean
+  chartProductType:     'bar' | 'pie'
+  slideMultiyearChart:  boolean
   analystModel:      string
   writerModel:       string
   dateFrom:          string
@@ -57,8 +58,9 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
   const [slideProductTable, setSlideProductTable] = useState(true)
   const [slideRegionTable,  setSlideRegionTable]  = useState(false)
   const [slideRepTable,     setSlideRepTable]     = useState(false)
-  const [slideChart,        setSlideChart]        = useState(true)
-  const [chartProductType,  setChartProductType]  = useState<'bar' | 'pie'>('bar')
+  const [slideChart,           setSlideChart]           = useState(true)
+  const [chartProductType,     setChartProductType]     = useState<'bar' | 'pie'>('bar')
+  const [slideMultiyearChart,  setSlideMultiyearChart]  = useState(false)
 
   // H-3: モデル選択
   const [availableModels, setAvailableModels] = useState<string[]>([])
@@ -222,6 +224,7 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
       slideRepTable,
       slideChart,
       chartProductType,
+      slideMultiyearChart,
       analystModel,
       writerModel,
       dateFrom,
@@ -377,10 +380,11 @@ const UploadForm: React.FC<Props> = ({ onGenerate, disabled }) => {
         <label>スライド構成</label>
         <div className="options-row">
           {[
-            ['商品別売上表', slideProductTable, setSlideProductTable],
-            ['地域別売上表', slideRegionTable,  setSlideRegionTable],
-            ['担当者別売上表', slideRepTable,   setSlideRepTable],
-            ['グラフスライド', slideChart,      setSlideChart],
+            ['商品別売上表',       slideProductTable,    setSlideProductTable],
+            ['地域別売上表',       slideRegionTable,     setSlideRegionTable],
+            ['担当者別売上表',     slideRepTable,        setSlideRepTable],
+            ['グラフスライド',     slideChart,           setSlideChart],
+            ['3年比較グラフ',      slideMultiyearChart,  setSlideMultiyearChart],
           ].map(([label, checked, setter]) => (
             <label key={label as string} className="checkbox-label">
               <input type="checkbox" checked={checked as boolean}

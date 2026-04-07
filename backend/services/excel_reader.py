@@ -176,6 +176,18 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
         qrep = qrep.iloc[:, -8:]
     quarterly_rep_pivot = qrep
 
+    # 年別月次データ（直近3年・月番号キー）
+    df["年"]   = df["日付"].dt.year
+    df["月番号"] = df["日付"].dt.month
+    recent_years = sorted(df["年"].unique())[-3:]
+    monthly_by_year: dict = {}
+    for y in recent_years:
+        ydf = df[df["年"] == y]
+        monthly_by_year[int(y)] = {
+            int(m): int(v)
+            for m, v in ydf.groupby("月番号")["売上金額"].sum().items()
+        }
+
     # 年次前年同期比（YoY）
     yoy_text = ""
     df["年"] = df["日付"].dt.year
@@ -228,4 +240,5 @@ def read_and_summarize(file_path: str, date_from: str = "", date_to: str = "") -
         "quarterly_rep_pivot":      quarterly_rep_pivot,
         "monthly_margin":           monthly_margin,
         "budget_by_product":        budget_by_product,
+        "monthly_by_year":          monthly_by_year,
     }

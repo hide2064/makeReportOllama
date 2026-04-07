@@ -358,6 +358,92 @@ def _add_chart_slide(prs, monthly_totals: dict, product_totals: dict,
     logger.info("グラフスライド追加")
 
 
+# ── Phase 4c: 3年間月次比較グラフスライド ────────────────────────
+
+def _add_multiyear_chart_slide(prs, monthly_by_year: dict):
+    """
+    3年分の月次売上を月別グループ棒グラフで表示し、
+    各年の月平均売上を水平破線で重ねるスライドを追加する。
+
+    monthly_by_year: {year(int): {month_num(int): sales(int), ...}, ...}
+    """
+    if not _MPL_OK:
+        logger.warning("matplotlib が利用不可 → 3年比較グラフをスキップ")
+        return
+    if not monthly_by_year:
+        logger.info("monthly_by_year なし → 3年比較グラフをスキップ")
+        return
+
+    slide = _add_blank_slide(prs)
+    _slide_header(slide, "月次売上 3年比較")
+    _slide_footer(slide)
+
+    years  = sorted(monthly_by_year.keys())
+    months = list(range(1, 13))
+    month_labels = [f"{m}月" for m in months]
+
+    n_years  = len(years)
+    bar_w    = 0.7 / max(n_years, 1)   # グループ内の棒幅
+    x_pos    = [m - 1 for m in months]  # 0〜11
+
+    C_NAVY  = "#0A1228"
+    C_GOLD  = "#D4941A"
+    C_TEAL  = "#00A39A"
+    C_GRAY  = "#D1D5DB"
+    YEAR_COLORS = [C_NAVY, C_GOLD, C_TEAL]
+    LINE_STYLES = ["--", "-.", ":"]
+
+    fig, ax = plt.subplots(figsize=(13.0, 4.6))
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+
+    for yi, year in enumerate(years):
+        color    = YEAR_COLORS[yi % len(YEAR_COLORS)]
+        offsets  = [x + (yi - n_years / 2 + 0.5) * bar_w for x in x_pos]
+        vals_man = [monthly_by_year[year].get(m, 0) // 10_000 for m in months]
+
+        ax.bar(offsets, vals_man, width=bar_w * 0.9, color=color,
+               label=str(year), zorder=3, alpha=0.85)
+
+        # 年平均売上（データがある月のみ）
+        nonzero = [v for v in vals_man if v > 0]
+        if nonzero:
+            avg = sum(nonzero) / len(nonzero)
+            ax.axhline(avg, color=color, linewidth=1.5,
+                       linestyle=LINE_STYLES[yi % len(LINE_STYLES)],
+                       label=f"{year}年 月平均 {avg:,.0f}万", zorder=4)
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(month_labels, fontsize=8)
+    ax.set_ylabel("（万円）", fontsize=8, color="#555")
+    ax.set_title("月次売上推移（3年比較）", fontsize=11, fontweight="bold",
+                 color=C_NAVY, pad=10, loc="left")
+    ax.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}")
+    )
+    ax.yaxis.grid(True, linestyle="--", linewidth=0.5, color=C_GRAY, zorder=0)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.tick_params(axis="both", length=0)
+    ax.legend(loc="upper left", fontsize=7.5, frameon=False, ncol=n_years * 2)
+
+    plt.tight_layout(pad=1.8)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight",
+                facecolor="#F6F8FC")
+    plt.close(fig)
+    buf.seek(0)
+
+    margin     = 180_000
+    img_top    = 750_000
+    img_width  = W - 2 * margin
+    img_height = H - img_top - 420_000
+    slide.shapes.add_picture(buf, Emu(margin), Emu(img_top),
+                             Emu(img_width), Emu(img_height))
+    logger.info("3年比較グラフスライド追加")
+
+
 # ── テンプレートプレースホルダー置換 ─────────────────────────────
 
 def _replace_text_in_slide(slide, replacements: dict[str, str]):
@@ -387,17 +473,19 @@ def generate_pptx(
     quarterly_region_pivot                 = None,   # pandas DataFrame | None
     quarterly_rep_pivot                    = None,   # pandas DataFrame | None
     monthly_margin:            dict | None = None,
+    monthly_by_year:           dict | None = None,
     slide_options:             dict | None = None,
 ) -> str:
     """
     テンプレートを元に報告書 PPTX を生成して output_path に保存。
     Phase 4: 売上表スライド・グラフスライドをテンプレートの後ろに追加する。
     slide_options キー:
-      product_table (bool, default True)
-      region_table  (bool, default False)
-      rep_table     (bool, default False)
-      chart         (bool, default True)
+      product_table      (bool, default True)
+      region_table       (bool, default False)
+      rep_table          (bool, default False)
+      chart              (bool, default True)
       chart_product_type ("bar" | "pie", default "bar")
+      multiyear_chart    (bool, default False)
     """
     logger.info(f"PPTX 生成開始: template={template_path}")
     if not Path(template_path).exists():
@@ -409,6 +497,7 @@ def generate_pptx(
     do_rep_table        = opts.get("rep_table", False)
     do_chart            = opts.get("chart", True)
     chart_product_type  = opts.get("chart_product_type", "bar")
+    do_multiyear_chart  = opts.get("multiyear_chart", False)
 
     prs   = Presentation(template_path)
     today = date.today().strftime("%Y年%m月%d日")
@@ -441,6 +530,10 @@ def generate_pptx(
             monthly_margin,
             chart_product_type,
         )
+
+    # Phase 4c: 3年比較グラフスライド
+    if do_multiyear_chart and monthly_by_year:
+        _add_multiyear_chart_slide(prs, monthly_by_year)
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     prs.save(output_path)

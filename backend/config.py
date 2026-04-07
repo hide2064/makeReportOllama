@@ -19,8 +19,8 @@ OLLAMA_EMBED_URL  = f"{OLLAMA_BASE_URL}/api/embeddings"
 OLLAMA_TAGS_URL   = f"{OLLAMA_BASE_URL}/api/tags"
 
 # モデル名（環境変数で上書き可）
-MODEL_ANALYST = os.environ.get("OLLAMA_MODEL_ANALYST", "qwen2.5:3b")
-MODEL_WRITER  = os.environ.get("OLLAMA_MODEL_WRITER",  "qwen3:8b")
+MODEL_ANALYST = os.environ.get("OLLAMA_MODEL_ANALYST", "gemma4:e4b")
+MODEL_WRITER  = os.environ.get("OLLAMA_MODEL_WRITER",  "gemma4:e4b")
 MODEL_EMBED   = os.environ.get("OLLAMA_MODEL_EMBED",   "nomic-embed-text")
 
 # タイムアウト (秒)
